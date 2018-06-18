@@ -139,7 +139,7 @@ bool parsemkv(std::string file
 ,             std::string &error)
 {
   std::ifstream ifs;
-  std::vector<std::string> codecid, name, language, width, height, freq,
+  std::vector<std::string> codecid, duration, name, language, width, height, freq,
     channels, filename, mime, fdata;
   std::string command, line;
 
@@ -179,6 +179,7 @@ bool parsemkv(std::string file
 
   const std::string
     S_codecid =  "|  + Codec ID: ",
+    S_duration = "|  + Default duration: ",
     S_name =     "|  + Name: ",
     S_language = "|  + Language: ",
     S_tvideo =   "|  + Video track",
@@ -201,6 +202,7 @@ bool parsemkv(std::string file
     if (tracks_begin) {
       if (line == "| + Track") {
         codecid.push_back("");
+        duration.push_back("");
         name.push_back("");
         language.push_back("und");
         width.push_back("");
@@ -212,6 +214,10 @@ bool parsemkv(std::string file
       }
       else if (checkLine(line, S_codecid)) {
         pop_push_back(codecid, line);
+        continue;
+      }
+      else if (checkLine(line, S_duration)) {
+        pop_push_back(duration, line);
         continue;
       }
       else if (checkLine(line, S_name)) {
@@ -318,9 +324,26 @@ bool parsemkv(std::string file
       << language.at(i) << "]";
 
     if (type == "video") {
+      std::string fps = duration.at(i);
+      std::string s = " frames/fields per second for a video track)";
+      size_t fps_len = fps.size();
+      size_t s_len = s.size();
+
       ss1 << " ["
         << width.at(i)
-        << height.at(i) << "]";
+        << height.at(i);
+
+      /* get fps value */
+      if (fps_len > s_len && fps.substr(fps_len - s_len) == s) {
+        fps.erase(fps_len - s_len, s_len);
+        std::size_t pos = fps.find_last_of('(');
+        if (pos != std::string::npos) {
+          fps.erase(0, pos + 1);
+          ss1 << ", " << fps << " fps";
+        }
+      }
+
+      ss1 << "]";
 
       timestampIDs.push_back(i);
     }
