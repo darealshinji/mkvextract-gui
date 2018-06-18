@@ -1,0 +1,16 @@
+<!--
+  This is free and unencumbered software released into the public domain.
+  For more information, please refer to <http://unlicense.org/>
+ -->
+<svg width="1024" height="1024" version="1.1" viewBox="0 0 270.93 270.93" xmlns="http://www.w3.org/2000/svg">
+ <g stroke-width=".18116" transform="translate(0 -26.067)">
+  <rect x="181.1"   y="152.81"  width="89.834" height="17.446" ry="3.8885" fill="#333333" />
+  <rect x="0"       y="152.81"  width="89.834" height="17.446" ry="3.8885" fill="#999999" />
+  <rect x="26.067"  y="-144.19" width="89.834" height="17.446" ry="3.8885" fill="#000000" transform="rotate(90)"  />
+  <rect x="207.17"  y="-144.19" width="89.834" height="17.446" ry="3.8885" fill="#666666" transform="rotate(90)"  />
+  <rect x="255.64"  y="9.7088"  width="89.834" height="17.446" ry="3.8885" fill="#4d4d4d" transform="rotate(45)"  />
+  <rect x="74.544"  y="9.7088"  width="89.834" height="17.446" ry="3.8885" fill="#b3b3b3" transform="rotate(45)"  />
+  <rect x="-117.03" y="-218.73" width="89.834" height="17.446" ry="3.8885" fill="#1a1a1a" transform="rotate(135)" />
+  <rect x="64.064"  y="-218.73" width="89.834" height="17.446" ry="3.8885" fill="#808080" transform="rotate(135)" />
+ </g>
+</svg>

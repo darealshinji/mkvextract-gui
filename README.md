@@ -1,7 +1,7 @@
 Simple GUI for mkvextract using FLTK.
 Requires mkvinfo and mkvextract to be in PATH.
 
-Easiest way to build is with `fltk-config --compile mkvextract-gui.cpp`
+Easiest way to build is with `fltk-config --use-images --compile mkvextract-gui.cpp`
 
 First download FLTK verson 1.3 or 1.4 with either svn or git:
 ``` sh
@@ -31,7 +31,7 @@ make -j4
 make install
 
 cd ../..
-./fltk/build/usr/bin/fltk-config --compile mkvextract-gui.cpp
+./fltk/build/usr/bin/fltk-config --use-images --compile mkvextract-gui.cpp
 ```
 
 You can create a .mkv file for testing:

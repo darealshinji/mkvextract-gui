@@ -30,10 +30,12 @@
 #include <FL/Fl_Check_Button.H>
 #include <FL/Fl_File_Chooser.H>
 #include <FL/Fl_Native_File_Chooser.H>
+#include <FL/Fl_PNG_Image.H>
 #include <FL/Fl_Double_Window.H>
 #include <FL/filename.H>
 
 #include <cstdlib>
+#include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -49,15 +51,32 @@
 #include "dnd.hpp"
 #include "misc.hpp"
 #include "parsemkv.hpp"
+#include "rotate.h"
+#include "mkvtoolnix/icon.h"
 
 #define LOCK    Fl::lock();
 #define UNLOCK  Fl::unlock(); Fl::awake();
+
+Fl_RGB_Image *img_arr[] = {
+  new Fl_PNG_Image(NULL, __1_png, __1_png_len),
+  new Fl_PNG_Image(NULL, __2_png, __2_png_len),
+  new Fl_PNG_Image(NULL, __3_png, __3_png_len),
+  new Fl_PNG_Image(NULL, __4_png, __4_png_len),
+  new Fl_PNG_Image(NULL, __5_png, __5_png_len),
+  new Fl_PNG_Image(NULL, __6_png, __6_png_len),
+  new Fl_PNG_Image(NULL, __7_png, __7_png_len),
+  new Fl_PNG_Image(NULL, __8_png, __8_png_len)
+};
+const float img_duration = 0.1;  /* seconds */
+const int last_frame = 7;  /* range 0-7 */
+const int img_w = 24, img_h = 24;
+int current_frame = 0;
 
 Fl_Double_Window *win;
 Fl_Check_Browser *browser;
 dnd_box *dnd_area;
 Fl_Button *but_outdir, *but_add, *but_extract, *but_abort;
-Fl_Box *progress_box, *outdir_field, *infile_label;
+Fl_Box *progress_box, *outdir_field, *infile_label, *rotate_img;
 Fl_Check_Button *check_outdir;
 
 pthread_t pt;
@@ -160,6 +179,18 @@ CHECK_AGAIN:
   win->redraw();
 }
 
+static void rotate_cb(Fl_Widget *)
+{
+  if (current_frame < last_frame) {
+    current_frame++;
+  } else {
+    current_frame = 0;
+  }
+  rotate_img->image(img_arr[current_frame]);
+  rotate_img->redraw();
+  Fl::repeat_timeout(img_duration, (Fl_Timeout_Handler)rotate_cb);
+}
+
 static void dnd_callback(Fl_Widget *)
 {
   std::string items(Fl::event_text());
@@ -246,11 +277,14 @@ extern "C" void *run_extraction_command(void *)
   const size_t keyword_pid_len = 5;
 
   LOCK
+
   dnd_area->deactivate();
   check_outdir->deactivate();
   but_outdir->deactivate();
   but_add->deactivate();
   but_abort->show();
+  Fl::add_timeout(img_duration, (Fl_Timeout_Handler)rotate_cb);
+
   UNLOCK
 
   if ((fp = popen(command.c_str(), "re")) == NULL) {
@@ -289,11 +323,16 @@ extern "C" void *run_extraction_command(void *)
   }
 
   LOCK
+
   dnd_area->activate();
   check_outdir->activate();
   but_outdir->activate();
   but_add->activate();
   but_abort->hide();
+
+  Fl::remove_timeout((Fl_Timeout_Handler)rotate_cb);
+  rotate_img->image(NULL);
+
   UNLOCK
 
   return nullptr;
@@ -393,11 +432,15 @@ static void abort_cb(Fl_Widget *)
     pid = -1;
   }
   pthread_cancel(pt);
+
   progress_box->label("STOPPED");
   check_outdir->activate();
   but_outdir->activate();
   but_add->activate();
   but_abort->hide();
+
+  Fl::remove_timeout((Fl_Timeout_Handler)rotate_cb);
+  rotate_img->image(NULL);
 }
 
 static void check_outdir_cb(Fl_Widget *)
@@ -431,8 +474,6 @@ static void close_cb(Fl_Widget *) {
 
 int main(void)
 {
-  std::stringstream ss;
-  std::string title;
   Fl_Box *dummy;
   Fl_Group *g, *g_inside1, *g_inside2;
   char *current_dir;
@@ -457,17 +498,21 @@ int main(void)
     outdir_manual = "/tmp/";
   }
 
-  /* get FLTK version for window title */
+  /* get and print FLTK version */
   int version = Fl::api_version();
   int major = version / 10000;
   int minor = (version % 10000) / 100;
   int patch = version % 100;
-  ss << "mkvextract GUI (using FLTK " << major << "." << minor << "." << patch << ")";
+  std::cout << "using FLTK " << major << "." << minor << "." << patch << " - http://fltk.org/\n"
+    << "window icon was taken from mkvtoolnix - https://mkvtoolnix.download/\n"
+    << "source code available at https://github.com/darealshinji/mkvextract-gui" << std::endl;
 
   Fl::scheme("gtk+");
+  Fl::visual(FL_DOUBLE|FL_INDEX);
+  Fl_Window::default_icon(new Fl_PNG_Image(NULL, icon_png, (int)icon_png_len));
 
   win = new Fl_Double_Window(w, h);
-  win->copy_label(ss.str().c_str());
+  win->copy_label("mkvextract GUI");
   win->callback(close_cb);
   {
     g = new Fl_Group(0, h - but_h*2 - 25, w, but_h*2 + 25);
@@ -496,7 +541,9 @@ int main(void)
         progress_box = new Fl_Box(10, h - 10 - but_h, but_w, but_h);
         progress_box->box(FL_THIN_DOWN_BOX);
 
-        dummy = new Fl_Box(but_add->x() - 1, h - 20 - but_h, 1, 1);
+        rotate_img = new Fl_Box(but_w + 15, progress_box->y(), img_w, img_h);
+
+        dummy = new Fl_Box(but_add->x() - 1, progress_box->y(), 1, 1);
         dummy->box(FL_NO_BOX);
       }
       g_inside1->resizable(dummy);
