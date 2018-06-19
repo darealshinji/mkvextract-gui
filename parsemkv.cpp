@@ -324,22 +324,24 @@ bool parsemkv(std::string file
       << language.at(i) << "]";
 
     if (type == "video") {
-      std::string fps = duration.at(i);
-      std::string s = " frames/fields per second for a video track)";
-      size_t fps_len = fps.size();
-      size_t s_len = s.size();
+      std::string s1 = duration.at(i);
+      std::string s2 = " frames/fields per second for a video track)";
+      size_t l1 = s1.size(), l2 = s2.size(), pos;
 
       ss1 << " ["
         << width.at(i)
         << height.at(i);
 
       /* get fps value */
-      if (fps_len > s_len && fps.substr(fps_len - s_len) == s) {
-        fps.erase(fps_len - s_len, s_len);
-        std::size_t pos = fps.find_last_of('(');
-        if (pos != std::string::npos) {
-          fps.erase(0, pos + 1);
-          ss1 << ", " << fps << " fps";
+      if (l1 > l2 && s1.substr(l1 - l2) == s2) {
+        s1.erase(l1 - l2, l2);  /* remove s2 from the end of s1 */
+        if ((pos = s1.find_last_of('(')) != std::string::npos) {
+          s1.erase(0, pos + 1);
+          if (s1.find_first_not_of("0123456789.") == std::string::npos &&  /* only numbers and dots */
+              s1.find('.') == s1.rfind('.'))  /* no more than 1 dot */
+          {
+            ss1 << ", " << atof(s1.c_str()) << " fps";
+          }
         }
       }
 
