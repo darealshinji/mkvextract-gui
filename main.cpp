@@ -58,18 +58,17 @@
 #define UNLOCK  Fl::unlock(); Fl::awake();
 
 Fl_RGB_Image *img_arr[] = {
+  new Fl_PNG_Image(NULL, __0_png, __0_png_len),
   new Fl_PNG_Image(NULL, __1_png, __1_png_len),
   new Fl_PNG_Image(NULL, __2_png, __2_png_len),
   new Fl_PNG_Image(NULL, __3_png, __3_png_len),
   new Fl_PNG_Image(NULL, __4_png, __4_png_len),
   new Fl_PNG_Image(NULL, __5_png, __5_png_len),
   new Fl_PNG_Image(NULL, __6_png, __6_png_len),
-  new Fl_PNG_Image(NULL, __7_png, __7_png_len),
-  new Fl_PNG_Image(NULL, __8_png, __8_png_len)
+  new Fl_PNG_Image(NULL, __7_png, __7_png_len)
 };
 const float img_duration = 0.1;  /* seconds */
-const int last_frame = 7;  /* range 0-7 */
-const int img_w = 24, img_h = 24;
+const int last_frame = 7;
 int current_frame = 0;
 
 Fl_Double_Window *win;
@@ -187,7 +186,7 @@ static void rotate_cb(Fl_Widget *)
     current_frame = 0;
   }
   rotate_img->image(img_arr[current_frame]);
-  rotate_img->redraw();
+  rotate_img->parent()->redraw();
   Fl::repeat_timeout(img_duration, (Fl_Timeout_Handler)rotate_cb);
 }
 
@@ -541,7 +540,7 @@ int main(void)
         progress_box = new Fl_Box(10, h - 10 - but_h, but_w, but_h);
         progress_box->box(FL_THIN_DOWN_BOX);
 
-        rotate_img = new Fl_Box(but_w + 15, progress_box->y(), img_w, img_h);
+        rotate_img = new Fl_Box(but_w + 15, progress_box->y(), but_h, but_h);
 
         dummy = new Fl_Box(but_add->x() - 1, progress_box->y(), 1, 1);
         dummy->box(FL_NO_BOX);
@@ -582,6 +581,9 @@ int main(void)
   win->show();
 
   LOCK
+
+  /* uncomment for testing */
+  //Fl::add_timeout(img_duration, (Fl_Timeout_Handler)rotate_cb);
 
   return Fl::run();
 }
