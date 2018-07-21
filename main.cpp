@@ -83,9 +83,9 @@ pid_t pid = -1;
 bool chapters = false, same_as_source = false;
 size_t count = 0, attach_count = 0;
 
-std::string file, outdir, outdir_auto, outdir_manual, command;
+std::string file, outdir, outdir_auto, outdir_manual;
 std::vector<int> timestampIDs;
-std::vector<std::string> outnames;
+std::vector<std::string> outnames, args;
 
 
 void error_exit(const char *title, const char *message)
@@ -176,6 +176,38 @@ CHECK_AGAIN:
   infile_label->copy_label(file.c_str());
   check_outdir->activate();
   win->redraw();
+}
+
+FILE *popen_mkvextract(void)
+{
+  enum { r = 0, w = 1 };
+  int fd[2];
+
+  if (pipe(fd) == -1) {
+    return NULL;
+  }
+
+  if ((pid = fork()) == 0) {
+    size_t len = args.size();
+    char *child_argv[len + 1];
+
+    child_argv[0] = const_cast<char *>("mkvextract");
+    for (size_t i = 1; i < len; i++) {
+      child_argv[i] = const_cast<char *>(args.at(i).c_str());
+    }
+    child_argv[len] = NULL;
+
+    close(fd[r]);
+    dup2(fd[w], 1);
+    close(fd[w]);
+    execvp("mkvextract", child_argv);
+    _exit(127);
+  } else {
+    close(fd[w]);
+    return fdopen(fd[r], "r");
+  }
+
+  return NULL;
 }
 
 static void rotate_cb(Fl_Widget *)
@@ -272,8 +304,6 @@ extern "C" void *run_extraction_command(void *)
 
   const char *keyword = "#GUI#progress ";
   const size_t keyword_len = 14;
-  const char *keyword_pid = "#PID ";
-  const size_t keyword_pid_len = 5;
 
   LOCK
 
@@ -286,7 +316,7 @@ extern "C" void *run_extraction_command(void *)
 
   UNLOCK
 
-  if ((fp = popen(command.c_str(), "re")) == NULL) {
+  if ((fp = popen_mkvextract()) == NULL) {
     LOCK
     progress_box->label(l);
     UNLOCK
@@ -294,16 +324,11 @@ extern "C" void *run_extraction_command(void *)
   else
   {
     while (getline(&line, &n, fp) != -1) {
-      if (line) {
-        if (strncmp(line, keyword, keyword_len) == 0) {
-          LOCK
-          /* trailing newline is ignored by label() */
-          progress_box->copy_label(line + keyword_len);
-          UNLOCK
-        }
-        else if (pid < 1 && strncmp(line, keyword_pid, keyword_pid_len) == 0) {
-          pid = (pid_t) atol(line + keyword_pid_len);
-        }
+      if (line && strncmp(line, keyword, keyword_len) == 0) {
+        LOCK
+        /* trailing newline is ignored by label() */
+        progress_box->copy_label(line + keyword_len);
+        UNLOCK
       }
     }
 
@@ -339,7 +364,7 @@ extern "C" void *run_extraction_command(void *)
 
 bool create_extraction_command(void)
 {
-  std::stringstream ss_tracks, ss_attach, ss_timestamps;
+  bool has_tracks = false, has_attach = false, has_timestamps = false;
   std::string attach_dir;
   size_t timestamps_entry, tags_entry, chapters_entry;
 
@@ -360,60 +385,79 @@ bool create_extraction_command(void)
     }
   }
 
-  command = "mkvextract \"" + file + "\" --ui-language en_US --gui-mode";
+  if (args.size() > 0) {
+    args.erase(args.begin(), args.end());
+  }
+
+  args.push_back("mkvextract");
+  args.push_back(file);
+  args.push_back("--ui-language");
+  args.push_back("en_US");
+  args.push_back("--gui-mode");
+
   outdir = same_as_source ? outdir_auto : outdir_manual;
 
+  /* tracks */
   for (size_t i = 0; i < count; i++) {
     if (browser->checked(i+1)) {
-      ss_tracks << " " << i << ":\"" << outdir << base << " - " << outnames.at(i) << "\"";
+      if (!has_tracks) {
+        has_tracks = true;
+        args.push_back("tracks");
+      }
+      std::stringstream ss;
+      ss << i << ":" << outdir << base << " - " << outnames.at(i);
+      args.push_back(ss.str());
     }
   }
 
+  /* attachments */
   if (attach_count > 0) {
     attach_dir = outdir + base + " - Attachments/";
     for (size_t i = 0; i < attach_count; i++) {
       if (browser->checked(i+count+1)) {
-        ss_attach << " " << i+1 << ":\"" << attach_dir << outnames.at(i+count) << "\"";
+        if (!has_attach) {
+          has_attach = true;
+          args.push_back("attachments");
+        }
+        std::stringstream ss;
+        ss << i+1 << ":" << attach_dir << outnames.at(i+count);
+        args.push_back(ss.str());
       }
     }
-  }
-
-  if (ss_tracks.str().size() > 0) {
-    command += " tracks" + ss_tracks.str();
-  }
-
-  if (ss_attach.str().size() > 0) {
-    command += " attachments" + ss_attach.str();
-    mkdir(attach_dir.c_str(), 0775);
   }
 
   timestamps_entry = count + attach_count + 1;
   tags_entry = count + attach_count + 2;
 
+  /* chapters */
   if (chapters) {
     chapters_entry = count + attach_count + 1;
     timestamps_entry++;
     tags_entry++;
     if (browser->checked(chapters_entry)) {
-      command += " chapters \"" + outdir + base + " - chapters.xml\"";
+      args.push_back("chapters");
+      args.push_back(outdir + base + " - chapters.xml");
     }
   }
 
+  /* timestamps */
   if (browser->checked(timestamps_entry) && timestampIDs.size() > 0) {
-    std::stringstream ss_tmp;
     for (size_t i = 0; i < timestampIDs.size(); i++) {
+      if (!has_timestamps) {
+        has_timestamps = true;
+        args.push_back("timestamps_v2");
+      }
       int id = timestampIDs.at(i);
-      ss_tmp << " " << id << ":\"" << outdir << base
-        << " - track_" << id+1 << "_video_timestamps_v2.txt\"";
+      std::stringstream ss;
+      ss << id << ":" << outdir << base << " - track_" << id+1 << "_video_timestamps_v2.txt";
+      args.push_back(ss.str());
     }
-    command += " timestamps_v2" + ss_tmp.str();
   }
 
   if (browser->checked(tags_entry)) {
-    command += " tags \"" + outdir + base + " - tags.xml\"";
+    args.push_back("tags");
+    args.push_back(outdir + base + " - tags.xml");
   }
-
-  command += " & echo \"#PID $!\"";
 
   return true;
 }
@@ -426,7 +470,7 @@ static void extract_cb(Fl_Widget *) {
 
 static void abort_cb(Fl_Widget *)
 {
-  if (pid > 1) {
+  if (pid > getpid()) {
     kill(pid, 1);
     pid = -1;
   }

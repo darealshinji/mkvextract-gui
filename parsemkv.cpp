@@ -27,6 +27,8 @@
 #include <string>
 #include <vector>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 static const char *codecList[][2] = {
@@ -129,6 +131,28 @@ inline static void pop_push_back(std::vector<std::string> &v, std::string s) {
   v.push_back(s);
 }
 
+static int run_mkvinfo(const char *infile, const char *logfile)
+{
+  int status;
+  int rv = 127;
+  pid_t pid = fork();
+
+  if (pid == 0) {
+    execlp("mkvinfo", "mkvinfo",
+           "--ui-language", "en_US",
+           //"--output-charset", "utf8",
+           "--redirect-output", logfile,
+           infile, NULL);
+    _exit(127);
+  }
+
+  if (pid > 0 && waitpid(pid, &status, 0) > 0 && WIFEXITED(status) == 1) {
+    rv = WEXITSTATUS(status);
+  }
+
+  return rv;
+}
+
 bool parsemkv(std::string file
 ,             std::vector<std::string> &trackInfos
 ,             std::vector<std::string> &trackFilenames
@@ -141,7 +165,7 @@ bool parsemkv(std::string file
   std::ifstream ifs;
   std::vector<std::string> codecid, duration, name, language, width, height, freq,
     channels, filename, mime, fdata;
-  std::string command, line;
+  std::string line;
 
   error = "";
 
@@ -152,10 +176,7 @@ bool parsemkv(std::string file
     return false;
   }
 
-  command = "mkvinfo --ui-language en_US -q \"" + file + "\" > ";
-  command.append(stats);
-
-  if (system(command.c_str()) != 0) {
+  if (run_mkvinfo(file.c_str(), stats) != 0) {
     error = "mkvinfo has returned an error";
     return false;
   }
@@ -170,7 +191,9 @@ bool parsemkv(std::string file
   /* start parsing the stats file */
 
   std::getline(ifs, line);
-  if (line != "+ EBML head") {
+  if (line != "\xEF\xBB\xBF" /* UTF8 byte order mark */ "+ EBML head" &&
+      line != "+ EBML head")
+  {
     error = "malformed stats file:\n";
     error.append(stats);
     ifs.close();
