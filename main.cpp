@@ -83,7 +83,7 @@ pid_t pid = -1;
 bool chapters = false, same_as_source = false;
 size_t count = 0, attach_count = 0;
 
-std::string file, outdir, outdir_auto, outdir_manual;
+std::string file, outdir_auto, outdir_manual;
 std::vector<int> timestampIDs;
 std::vector<std::string> outnames, args;
 
@@ -182,30 +182,31 @@ FILE *popen_mkvextract(void)
 {
   enum { r = 0, w = 1 };
   int fd[2];
+  size_t len;
 
   if (pipe(fd) == -1) {
     return NULL;
   }
 
-  if ((pid = fork()) == 0) {
-    size_t len = args.size();
-    char *child_argv[len + 1];
-
-    child_argv[0] = const_cast<char *>("mkvextract");
-    for (size_t i = 1; i < len; i++) {
-      child_argv[i] = const_cast<char *>(args.at(i).c_str());
-    }
-    child_argv[len] = NULL;
-
-    close(fd[r]);
-    dup2(fd[w], 1);
-    close(fd[w]);
-    execvp("mkvextract", child_argv);
-    _exit(127);
-  } else {
+  if ((pid = fork()) != 0) {
     close(fd[w]);
     return fdopen(fd[r], "r");
   }
+
+  len = args.size();
+  char **child_argv = new char *[len + 1];
+
+  for (size_t i = 0; i < len; i++) {
+    child_argv[i] = const_cast<char *>(args.at(i).c_str());
+  }
+  child_argv[len] = NULL;
+
+  close(fd[r]);
+  dup2(fd[w], 1);
+  close(fd[w]);
+  execvp("mkvextract", child_argv);
+  delete[] child_argv;
+  _exit(127);
 
   return NULL;
 }
@@ -364,11 +365,11 @@ extern "C" void *run_extraction_command(void *)
 
 bool create_extraction_command(void)
 {
-  bool has_tracks = false, has_attach = false, has_timestamps = false;
+  bool has_tracks = false, has_attach = false;
   std::string attach_dir;
   size_t timestamps_entry, tags_entry, chapters_entry;
 
-  if (file.empty() || file.size() == 0) {
+  if (file.empty() || file.length() == 0) {
     return false;
   }
 
@@ -385,9 +386,7 @@ bool create_extraction_command(void)
     }
   }
 
-  if (args.size() > 0) {
-    args.erase(args.begin(), args.end());
-  }
+  CLEAR_VECTOR(args)
 
   args.push_back("mkvextract");
   args.push_back(file);
@@ -395,7 +394,11 @@ bool create_extraction_command(void)
   args.push_back("en_US");
   args.push_back("--gui-mode");
 
-  outdir = same_as_source ? outdir_auto : outdir_manual;
+  if (same_as_source) {
+    base = outdir_auto + base;
+  } else {
+    base = outdir_manual + base;
+  }
 
   /* tracks */
   for (size_t i = 0; i < count; i++) {
@@ -405,14 +408,14 @@ bool create_extraction_command(void)
         args.push_back("tracks");
       }
       std::stringstream ss;
-      ss << i << ":" << outdir << base << " - " << outnames.at(i);
+      ss << i << ":" << base << " - " << outnames.at(i);
       args.push_back(ss.str());
     }
   }
 
   /* attachments */
   if (attach_count > 0) {
-    attach_dir = outdir + base + " - Attachments/";
+    attach_dir = base + " - Attachments/";
     for (size_t i = 0; i < attach_count; i++) {
       if (browser->checked(i+count+1)) {
         if (!has_attach) {
@@ -427,36 +430,33 @@ bool create_extraction_command(void)
   }
 
   timestamps_entry = count + attach_count + 1;
-  tags_entry = count + attach_count + 2;
+  tags_entry = timestamps_entry + 1;
 
   /* chapters */
   if (chapters) {
-    chapters_entry = count + attach_count + 1;
+    chapters_entry = timestamps_entry;
     timestamps_entry++;
     tags_entry++;
     if (browser->checked(chapters_entry)) {
       args.push_back("chapters");
-      args.push_back(outdir + base + " - chapters.xml");
+      args.push_back(base + " - chapters.xml");
     }
   }
 
   /* timestamps */
   if (browser->checked(timestamps_entry) && timestampIDs.size() > 0) {
+    args.push_back("timestamps_v2");
     for (size_t i = 0; i < timestampIDs.size(); i++) {
-      if (!has_timestamps) {
-        has_timestamps = true;
-        args.push_back("timestamps_v2");
-      }
       int id = timestampIDs.at(i);
       std::stringstream ss;
-      ss << id << ":" << outdir << base << " - track_" << id+1 << "_video_timestamps_v2.txt";
+      ss << id << ":" << base << " - track_" << id+1 << "_video_timestamps_v2.txt";
       args.push_back(ss.str());
     }
   }
 
   if (browser->checked(tags_entry)) {
     args.push_back("tags");
-    args.push_back(outdir + base + " - tags.xml");
+    args.push_back(base + " - tags.xml");
   }
 
   return true;
@@ -506,7 +506,7 @@ static void browser_cb(Fl_Widget *)
     progress_box->label("READY");
   } else {
     but_extract->deactivate();
-    progress_box->label("");
+    progress_box->label(NULL);
   }
 }
 
@@ -554,8 +554,7 @@ int main(void)
   Fl::visual(FL_DOUBLE|FL_INDEX);
   Fl_Window::default_icon(new Fl_PNG_Image(NULL, icon_png, (int)icon_png_len));
 
-  win = new Fl_Double_Window(w, h);
-  win->copy_label("mkvextract GUI");
+  win = new Fl_Double_Window(w, h, "mkvextract GUI");
   win->callback(close_cb);
   {
     g = new Fl_Group(0, h - but_h*2 - 25, w, but_h*2 + 25);

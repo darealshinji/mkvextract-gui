@@ -31,7 +31,9 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-static const char *codecList[][2] = {
+#include "misc.hpp"
+
+static const std::string codecList[][2] = {
   { "V_MS/VFW/FOURCC", "vfw" },
   { "V_UNCOMPRESSED", "raw" },
   { "V_MPEG4/ISO/AVC", "avc" },
@@ -103,19 +105,8 @@ static const char *codecList[][2] = {
   { "S_VOBSUB", "sub" },
   { "S_VOBSUB/ZLIB", "sub" },
   { "S_KATE", "kate" },
-  { "S_HDMV/PGS", "pgs" },
-  { NULL, NULL }
+  { "S_HDMV/PGS", "pgs" }
 };
-
-static const char *get_extension(std::string codecid)
-{
-  for (size_t i = 0; codecList[i][0] != NULL; i++) {
-    if (codecList[i][0] == codecid) {
-      return codecList[i][1];
-    }
-  }
-  return NULL;
-}
 
 inline static bool checkLine(std::string &line, const std::string str)
 {
@@ -220,6 +211,12 @@ bool parsemkv(std::string file
   unsigned short track_entry = tnone;
   has_chapters = false;
 
+  CLEAR_VECTOR(trackInfos)
+  CLEAR_VECTOR(trackFilenames)
+  CLEAR_VECTOR(attachmentInfos)
+  CLEAR_VECTOR(attachmentFilenames)
+  CLEAR_VECTOR(timestampIDs)
+
   /* parse tracks */
   while (std::getline(ifs, line)) {
     if (tracks_begin) {
@@ -271,7 +268,7 @@ bool parsemkv(std::string file
           pop_push_back(width, line);
           continue;
         }
-      else if (checkLine(line, S_height)) {
+        else if (checkLine(line, S_height)) {
           line = "x" + line;
           pop_push_back(height, line);
           continue;
@@ -329,7 +326,6 @@ bool parsemkv(std::string file
 
   for (size_t i = 0; i < codecid.size(); i++) {
     std::stringstream ss1, ss2;
-    const char *ext;
     std::string type;
 
     switch (codecid.at(i)[0]) {
@@ -381,9 +377,14 @@ bool parsemkv(std::string file
     trackInfos.push_back(ss1.str());
 
     ss2 << "track_" << i+1 << "_" << type;
-    if ((ext = get_extension(codecid.at(i))) != NULL) {
-      ss2 << "." << ext;
+
+    for (const auto &elem : codecList) {
+      if (elem[0] == codecid.at(i)) {
+        ss2 << "." << elem[1];
+        break;
+      }
     }
+
     trackFilenames.push_back(ss2.str());
   }
 

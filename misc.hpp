@@ -27,6 +27,8 @@
 
 #include <string>
 
+#define CLEAR_VECTOR(v)  if (v.size() > 0) { v.erase(v.begin(), v.end()); }
+
 void decode_uri(std::string &src);
 bool file_is_matroska(const char *file);
 
