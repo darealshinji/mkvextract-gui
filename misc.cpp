@@ -49,7 +49,7 @@ bool file_is_matroska(const char *file)
 {
   FILE *fp;
   size_t len;
-  unsigned char bytes[32];
+  unsigned char bytes[32] = {0};
 
   if (!file || !(fp = fopen(file, "r"))) {
     return false;

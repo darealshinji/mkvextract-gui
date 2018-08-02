@@ -131,7 +131,6 @@ static int run_mkvinfo(const char *infile, const char *logfile)
   if (pid == 0) {
     execlp("mkvinfo", "mkvinfo",
            "--ui-language", "en_US",
-           //"--output-charset", "utf8",
            "--redirect-output", logfile,
            infile, NULL);
     _exit(127);
@@ -154,13 +153,12 @@ bool parsemkv(std::string file
 ,             std::string &error)
 {
   std::ifstream ifs;
-  std::vector<std::string> codecid, duration, name, language, width, height, freq,
-    channels, filename, mime, fdata;
+  std::vector<std::string> codecid, duration, name, language, width, height,
+    freq, channels, filename, mime, fdata;
   std::string line;
 
-  error = "";
-
   char stats[] = "/tmp/mkvinfo-stats-XXXXXX";
+
   if (mkstemp(stats) == -1) {
     error = "cannot create temporary file:\n";
     error.append(stats);
@@ -173,6 +171,7 @@ bool parsemkv(std::string file
   }
 
   ifs.open(stats, std::ifstream::in);
+
   if (!ifs.is_open()) {
     error = "cannot open temporary file:\n";
     error.append(stats);
@@ -191,6 +190,8 @@ bool parsemkv(std::string file
     return false;
   }
 
+  error = "";
+
   const std::string
     S_codecid =  "|  + Codec ID: ",
     S_duration = "|  + Default duration: ",
@@ -206,9 +207,10 @@ bool parsemkv(std::string file
     S_mime =     "|  + MIME type: ",
     S_fdata =    "|  + File data: size ";
 
-  bool tracks_begin = false;
-  const unsigned short tnone = 0, tvideo = 1, taudio = 2;
+  enum { tnone = 0, tvideo = 1, taudio = 2 };
   unsigned short track_entry = tnone;
+
+  bool tracks_begin = false;
   has_chapters = false;
 
   CLEAR_VECTOR(trackInfos)
@@ -343,29 +345,37 @@ bool parsemkv(std::string file
       << language.at(i) << "]";
 
     if (type == "video") {
-      std::string s1 = duration.at(i);
-      std::string s2 = " frames/fields per second for a video track)";
-      size_t l1 = s1.size(), l2 = s2.size(), pos;
-
       ss1 << " ["
         << width.at(i)
         << height.at(i);
 
       /* get fps value */
+
+      std::string s1 = duration.at(i);
+      size_t l1 = s1.size();
+      const std::string s2 = " frames/fields per second for a video track)";
+      const size_t l2 = 44;  /* s2.size() */
+
       if (l1 > l2 && s1.substr(l1 - l2) == s2) {
         s1.erase(l1 - l2, l2);  /* remove s2 from the end of s1 */
-        if ((pos = s1.find_last_of('(')) != std::string::npos) {
+        size_t pos = s1.find_last_of('(');
+
+        if (pos != std::string::npos) {
           s1.erase(0, pos + 1);
+
           if (s1.find_first_not_of("0123456789.") == std::string::npos &&  /* only numbers and dots */
               s1.find('.') == s1.rfind('.'))  /* no more than 1 dot */
           {
-            ss1 << ", " << atof(s1.c_str()) << " fps";
+            ss1 << ", "
+              << atof(s1.c_str())  /* strip trailing zeros */
+              << " fps";
           }
         }
       }
 
       ss1 << "]";
 
+      /* for now only extract timestamps of video streams */
       timestampIDs.push_back(i);
     }
     else if (type == "audio") {
@@ -378,6 +388,8 @@ bool parsemkv(std::string file
 
     ss2 << "track_" << i+1 << "_" << type;
 
+    /* append the correct file extension
+     * depending on the codec ID */
     for (const auto &elem : codecList) {
       if (elem[0] == codecid.at(i)) {
         ss2 << "." << elem[1];
@@ -390,10 +402,12 @@ bool parsemkv(std::string file
 
   for (size_t i = 0; i < filename.size(); i++) {
     std::stringstream ss;
+
     ss << "Attachment " << i+1
       << " [" << filename.at(i) << "] ["
       << mime.at(i) << "] ["
       << fdata.at(i) << "]";
+
     attachmentInfos.push_back(ss.str());
     attachmentFilenames.push_back(filename.at(i));
   }
