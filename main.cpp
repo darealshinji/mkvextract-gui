@@ -59,14 +59,14 @@
 
 Fl_RGB_Image *img_arr[] =
 {
-  new Fl_PNG_Image(NULL, __0_png, static_cast<int>(__0_png_len)),
-  new Fl_PNG_Image(NULL, __1_png, static_cast<int>(__1_png_len)),
-  new Fl_PNG_Image(NULL, __2_png, static_cast<int>(__2_png_len)),
-  new Fl_PNG_Image(NULL, __3_png, static_cast<int>(__3_png_len)),
-  new Fl_PNG_Image(NULL, __4_png, static_cast<int>(__4_png_len)),
-  new Fl_PNG_Image(NULL, __5_png, static_cast<int>(__5_png_len)),
-  new Fl_PNG_Image(NULL, __6_png, static_cast<int>(__6_png_len)),
-  new Fl_PNG_Image(NULL, __7_png, static_cast<int>(__7_png_len))
+  new Fl_PNG_Image(NULL, __0_png, __0_png_len),
+  new Fl_PNG_Image(NULL, __1_png, __1_png_len),
+  new Fl_PNG_Image(NULL, __2_png, __2_png_len),
+  new Fl_PNG_Image(NULL, __3_png, __3_png_len),
+  new Fl_PNG_Image(NULL, __4_png, __4_png_len),
+  new Fl_PNG_Image(NULL, __5_png, __5_png_len),
+  new Fl_PNG_Image(NULL, __6_png, __6_png_len),
+  new Fl_PNG_Image(NULL, __7_png, __7_png_len)
 };
 
 const float img_duration = 0.1;  /* seconds */
@@ -646,7 +646,7 @@ int main(void)
 
   Fl::scheme("gtk+");
   Fl::visual(FL_DOUBLE|FL_INDEX);
-  Fl_Window::default_icon(new Fl_PNG_Image(NULL, icon_png, static_cast<int>(icon_png_len)));
+  Fl_Window::default_icon(new Fl_PNG_Image(NULL, icon_png, icon_png_len));
 
   win = new Fl_Double_Window(w, h, "mkvextract GUI");
   win->callback(close_cb);
