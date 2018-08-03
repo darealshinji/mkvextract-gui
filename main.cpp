@@ -149,7 +149,7 @@ CHECK_AGAIN:
     outdir_auto.erase(pos + 1);
   }
 
-  CLEAR_VECTOR(outnames)
+  outnames.clear();
   browser->clear();
   count = tracks.size();
   attach_count = attachments.size();

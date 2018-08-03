@@ -213,11 +213,11 @@ bool parsemkv(std::string file
   bool tracks_begin = false;
   has_chapters = false;
 
-  CLEAR_VECTOR(trackInfos)
-  CLEAR_VECTOR(trackFilenames)
-  CLEAR_VECTOR(attachmentInfos)
-  CLEAR_VECTOR(attachmentFilenames)
-  CLEAR_VECTOR(timestampIDs)
+  trackInfos.clear();
+  trackFilenames.clear();
+  attachmentInfos.clear();
+  attachmentFilenames.clear();
+  timestampIDs.clear();
 
   /* parse tracks */
   while (std::getline(ifs, line)) {
