@@ -80,6 +80,9 @@ Fl_Button *but_outdir, *but_add, *but_extract, *but_abort, *but_cmd;
 Fl_Box *progress_box, *outdir_field, *infile_label, *rotate_img;
 Fl_Check_Button *check_outdir;
 
+static void rotate_cb(Fl_Widget *);
+Fl_Timeout_Handler th = reinterpret_cast<Fl_Timeout_Handler>(rotate_cb);
+
 pthread_t pt;
 pid_t pid = -1;
 bool chapters = false, same_as_source = false;
@@ -222,7 +225,7 @@ static void rotate_cb(Fl_Widget *)
   }
   rotate_img->image(img_arr[current_frame]);
   rotate_img->parent()->redraw();
-  Fl::repeat_timeout(img_duration, (Fl_Timeout_Handler)rotate_cb);
+  Fl::repeat_timeout(img_duration, th);
 }
 
 static void dnd_callback(Fl_Widget *)
@@ -318,7 +321,7 @@ extern "C" void *run_extraction_command(void *)
   but_outdir->deactivate();
   but_add->deactivate();
   but_abort->show();
-  Fl::add_timeout(img_duration, (Fl_Timeout_Handler)rotate_cb);
+  Fl::add_timeout(img_duration, th);
 
   UNLOCK
 
@@ -360,7 +363,7 @@ extern "C" void *run_extraction_command(void *)
   but_add->activate();
   but_abort->hide();
 
-  Fl::remove_timeout((Fl_Timeout_Handler)rotate_cb);
+  Fl::remove_timeout(th);
   rotate_img->image(NULL);
 
   UNLOCK
@@ -408,7 +411,7 @@ bool create_extraction_command(bool extract)
   }
 
   if (extract) {
-    CLEAR_VECTOR(args)
+    args.clear();
     args.push_back("mkvextract");
     args.push_back(file);
     args.push_back("--ui-language");
@@ -547,7 +550,7 @@ static void copy_command_cb(Fl_Widget *)
     Fl::copy(command.c_str(), command.size(), 1);
     fl_close = "   OK ";
     fl_message_title("Clipboard");
-    fl_message("%s", "Extraction command successfully copied to clipboard.");
+    fl_message("%s", "Extraction command copied to clipboard.");
   }
 }
 
@@ -571,7 +574,7 @@ static void abort_cb(Fl_Widget *)
   but_add->activate();
   but_abort->hide();
 
-  Fl::remove_timeout((Fl_Timeout_Handler)rotate_cb);
+  Fl::remove_timeout(th);
   rotate_img->image(NULL);
 }
 
@@ -627,7 +630,7 @@ int main(void)
   if ((current_dir = get_current_dir_name()) != NULL) {
     outdir_manual = std::string(current_dir);
     if (outdir_manual[outdir_manual.size() - 1] != '/') {
-      outdir_manual += "/";
+      outdir_manual.push_back('/');
     }
     free(current_dir);
   } else {
@@ -732,7 +735,7 @@ int main(void)
   LOCK
 
   /* uncomment to test rotating animation */
-  //Fl::add_timeout(img_duration, (Fl_Timeout_Handler)rotate_cb);
+  //Fl::add_timeout(img_duration, th);
 
   return Fl::run();
 }
