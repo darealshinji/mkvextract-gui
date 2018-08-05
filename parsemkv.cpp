@@ -129,10 +129,7 @@ static int run_mkvinfo(const char *infile, const char *logfile)
   pid_t pid = fork();
 
   if (pid == 0) {
-    execlp("mkvinfo", "mkvinfo",
-           "--ui-language", "en_US",
-           "--redirect-output", logfile,
-           infile, NULL);
+    execlp("mkvinfo", "mkvinfo", "--ui-language", "en_US", "--redirect-output", logfile, infile, NULL);
     _exit(127);
   }
 

@@ -29,10 +29,10 @@
 void decode_uri(std::string &src)
 {
   std::string dest;
+  int n;
 
   for (size_t i = 0; i < src.length(); i++) {
     if (src[i] == '%') {
-      int n;
       if (sscanf(src.substr(i + 1, 2).c_str(), "%2X", &n) != 1) {
         break;
       }
