@@ -117,10 +117,12 @@ inline static bool checkLine(std::string &line, const std::string str)
   return false;
 }
 
+/*
 inline static void pop_push_back(std::vector<std::string> &v, std::string s) {
   v.pop_back();
   v.push_back(s);
 }
+*/
 
 static int run_mkvinfo(const char *infile, const char *logfile)
 {
@@ -139,6 +141,8 @@ static int run_mkvinfo(const char *infile, const char *logfile)
 
   return rv;
 }
+
+#define pop_push_back(v,s)  v.pop_back(); v.push_back(s)
 
 bool parsemkv(std::string file
 ,             std::vector<std::string> &trackInfos
@@ -411,4 +415,6 @@ bool parsemkv(std::string file
 
   return true;
 }
+
+#undef pop_push_back
 
