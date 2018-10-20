@@ -55,11 +55,7 @@
 #include "rotate.h"
 #include "mkvtoolnix/icon.h"
 
-#define LOCK    Fl::lock();
-#define UNLOCK  Fl::unlock(); Fl::awake();
-
-Fl_RGB_Image *img_arr[] =
-{
+Fl_RGB_Image *img_arr[] = {
   new Fl_PNG_Image(NULL, __0_png, __0_png_len),
   new Fl_PNG_Image(NULL, __1_png, __1_png_len),
   new Fl_PNG_Image(NULL, __2_png, __2_png_len),
@@ -237,18 +233,13 @@ static void browse_outdir_cb(Fl_Widget *)
   Fl_Native_File_Chooser *gtk;
   const char *dir;
 
-  if (getenv("KDE_FULL_SESSION")) {
-    /* don't use GTK file chooser on KDE, there may be layout issues */
-    dir = fl_dir_chooser("Select output directory", ".");
-  } else {
-    gtk = new Fl_Native_File_Chooser(Fl_Native_File_Chooser::BROWSE_DIRECTORY);
-    gtk->title("Select output directory");
+  gtk = new Fl_Native_File_Chooser(Fl_Native_File_Chooser::BROWSE_DIRECTORY);
+  gtk->title("Select output directory");
 
-    if (gtk->show() != 0) {
-      return;
-    }
-    dir = gtk->filename();
+  if (gtk->show() != 0) {
+    return;
   }
+  dir = gtk->filename();
 
   if (!dir) {
     return;
@@ -266,20 +257,14 @@ static void add_cb(Fl_Widget *)
   Fl_Native_File_Chooser *gtk;
   const char *file_;
 
-  /* open file */
-  if (getenv("KDE_FULL_SESSION")) {
-    /* don't use GTK file chooser on KDE, there may be layout issues */
-    file_ = fl_file_chooser("Select a file", "*.mkv,*.mk3d,*.mka,*.mks,*.webm", NULL);
-  } else {
-    gtk = new Fl_Native_File_Chooser(Fl_Native_File_Chooser::BROWSE_FILE);
-    gtk->title("Select a file");
-    gtk->filter("*.mkv|*.mk3d|*.mka|*.mks|*.webm");
+  gtk = new Fl_Native_File_Chooser(Fl_Native_File_Chooser::BROWSE_FILE);
+  gtk->title("Select a file");
+  gtk->filter("*.mkv|*.mk3d|*.mka|*.mks|*.webm");
 
-    if (gtk->show() != 0) {
-      return;
-    }
-    file_ = gtk->filename();
+  if (gtk->show() != 0) {
+    return;
   }
+  file_ = gtk->filename();
 
   if (!file_) {
     return;
@@ -302,7 +287,7 @@ extern "C" void *run_extraction_command(void *)
   const char *keyword = "#GUI#progress ";
   const size_t keyword_len = 14;
 
-  LOCK
+  Fl::lock();
 
   dnd_area->deactivate();
   check_outdir->deactivate();
@@ -311,21 +296,24 @@ extern "C" void *run_extraction_command(void *)
   but_abort->show();
   Fl::add_timeout(img_duration, th);
 
-  UNLOCK
+  Fl::unlock();
+  Fl::awake();
 
   if ((fp = popen_mkvextract()) == NULL) {
-    LOCK
+    Fl::lock();
     progress_box->label(l);
-    UNLOCK
+    Fl::unlock();
+    Fl::awake();
   }
   else
   {
     while (getline(&line, &n, fp) != -1) {
       if (line && strncmp(line, keyword, keyword_len) == 0) {
-        LOCK
+        Fl::lock();
         /* trailing newline is ignored by label() */
         progress_box->copy_label(line + keyword_len);
-        UNLOCK
+        Fl::unlock();
+        Fl::awake();
       }
     }
 
@@ -338,12 +326,13 @@ extern "C" void *run_extraction_command(void *)
       l = "DONE";
     }
 
-    LOCK
+    Fl::lock();
     progress_box->label(l);
-    UNLOCK
+    Fl::unlock();
+    Fl::awake();
   }
 
-  LOCK
+  Fl::lock();
 
   dnd_area->activate();
   check_outdir->activate();
@@ -354,7 +343,8 @@ extern "C" void *run_extraction_command(void *)
   Fl::remove_timeout(th);
   rotate_img->image(NULL);
 
-  UNLOCK
+  Fl::unlock();
+  Fl::awake();
 
   return nullptr;
 }
@@ -686,25 +676,17 @@ int main(int argc, char *argv[])
       but_extract->callback(extract_cb);
       but_extract->deactivate();
 
-      but_abort = new Fl_Button(w - 10 - but_w, h - 10 - but_h, but_w, but_h, "Abort");
+      but_abort = new Fl_Button(but_extract->x(), but_extract->y(), but_w, but_h, "Abort");
       but_abort->callback(abort_cb);
       but_abort->hide();
 
-      but_cmd = new Fl_Button(but_extract->x() - 10 - but_w, h - 10 - but_h, but_w, but_h, "Command");
+      but_cmd = new Fl_Button(but_extract->x() - 10 - but_w, but_extract->y(), but_w, but_h, "Command");
       but_cmd->callback(cmd_cb);
       but_cmd->deactivate();
 
-      check_outdir = new Fl_Check_Button(w - 10 - but_w, but_extract->y() - but_h - 5, but_w, but_h, " Use Source");
-      check_outdir->deactivate();
-      check_outdir->callback(check_outdir_cb);
-      check_outdir->clear_visible_focus();
-
-      but_outdir = new Fl_Button(check_outdir->x() - 10 - but_w, check_outdir->y(), but_w, but_h, "Destination");
-      but_outdir->callback(browse_outdir_cb);
-
-      g_inside1 = new Fl_Group(0, h - 10 - but_h, but_outdir->x() - 10, but_h);
+      g_inside1 = new Fl_Group(0, but_extract->y(), w - 30 - 2*but_w, but_h);
       {
-        progress_box = new Fl_Box(10, h - 10 - but_h, but_w, but_h);
+        progress_box = new Fl_Box(10, but_extract->y(), but_w, but_h);
         progress_box->box(FL_THIN_DOWN_BOX);
 
         rotate_img = new Fl_Box(but_w + 15, progress_box->y(), but_h, but_h);
@@ -715,29 +697,47 @@ int main(int argc, char *argv[])
       g_inside1->resizable(dummy1);
       g_inside1->end();
 
-      g_inside2 = new Fl_Group(0, h - but_h*2 - 25, but_outdir->x() - 10, but_h);
+      g_inside2 = new Fl_Group(0, g->y(), g_inside1->w(), but_h);
       {
-        outdir_field = new Fl_Box(10, but_outdir->y(), but_outdir->x() - 20, but_h, outdir_manual.c_str());
+        outdir_field = new Fl_Box(10, but_extract->y() - but_h - 5, g_inside2->w() - 10, but_h, outdir_manual.c_str());
         outdir_field->align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE);
         outdir_field->box(FL_THIN_DOWN_BOX);
       }
       g_inside2->resizable(outdir_field);
       g_inside2->end();
+
+      /* cover up the end of outdir_field */
+      { Fl_Box *o = new Fl_Box(outdir_field->x() + outdir_field->w(), outdir_field->y(), w - outdir_field->x(), outdir_field->h());
+       o->box(FL_FLAT_BOX); }
+
+      check_outdir = new Fl_Check_Button(but_extract->x(), but_extract->y() - but_h - 5, but_w, but_h, " Use Source");
+      check_outdir->deactivate();
+      check_outdir->callback(check_outdir_cb);
+      check_outdir->clear_visible_focus();
+
+      but_outdir = new Fl_Button(but_cmd->x(), check_outdir->y(), but_w, but_h, "Destination");
+      but_outdir->callback(browse_outdir_cb);
     }
     g->resizable(g_inside2);
     g->end();
 
     g_top = new Fl_Group(0, 0, w, but_h + 5);
     {
-      but_add = new Fl_Button(w - 10 - but_w, 5, but_w, but_h, "Open file");
-      but_add->callback(add_cb);
+      int but_add_x = w - 10 - but_w;
 
-      dummy2 = new Fl_Box(but_add->x() - 1, 5, 1, 1);
+      dummy2 = new Fl_Box(but_add_x - 1, 5, 1, 1);
       dummy2->box(FL_NO_BOX);
 
-      infile_label = new Fl_Box(11, 5, but_add->x() - 20, but_h, "(drag and drop a Matroska file)");
+      infile_label = new Fl_Box(11, 5, but_add_x - 20, but_h, "(drag and drop a Matroska file)");
       infile_label->align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE);
       infile_label->labelsize(12);
+
+      /* cover up the end of infile_label */
+      { Fl_Box *o = new Fl_Box(but_add_x, 0, w - but_add_x, but_h + 5);
+       o->box(FL_FLAT_BOX); }
+
+      but_add = new Fl_Button(but_add_x, 5, but_w, but_h, "Open file");
+      but_add->callback(add_cb);
     }
     g_top->resizable(dummy2);
     g_top->end();
@@ -771,7 +771,7 @@ int main(int argc, char *argv[])
     }
   }
 
-  LOCK
+  Fl::lock();
 
   /* uncomment to test rotating animation */
   //Fl::add_timeout(img_duration, th);
