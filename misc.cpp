@@ -23,8 +23,12 @@
  */
 
 #include <string>
+#include <vector>
 #include <stdio.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 void decode_uri(std::string &src)
 {
@@ -43,6 +47,20 @@ void decode_uri(std::string &src)
     }
   }
   src = dest;
+}
+
+/* replace all instances of »'« with »'\''« and put
+ * single quotes around the string */
+void quote_filename(std::string &s)
+{
+  size_t pos;
+  const size_t newlen = 4;  /* strlen("'\\''") == 4 */
+
+  for (pos = 0; (pos = s.find("'", pos)) != std::string::npos; pos += newlen) {
+    s.replace(pos, 1, "'\\''");
+  }
+  s.insert(0, 1, '\'');
+  s.push_back('\'');
 }
 
 bool file_is_matroska(const char *file)
@@ -73,5 +91,58 @@ bool file_is_matroska(const char *file)
     return true;
   }
   return false;
+}
+
+FILE *popen_mkvextract(const std::vector<std::string> args, pid_t &pid)
+{
+  enum { r = 0, w = 1 };
+  int fd[2];
+  size_t len;
+  char **child_argv;
+
+  if (pipe(fd) == -1) {
+    return NULL;
+  }
+
+  if ((pid = fork()) != 0) {
+    close(fd[w]);
+    return fdopen(fd[r], "r");
+  }
+
+  len = args.size();
+  child_argv = new char *[len + 1];
+
+  for (size_t i = 0; i < len; i++) {
+    child_argv[i] = const_cast<char *>(args.at(i).c_str());
+  }
+  child_argv[len] = NULL;
+
+  close(fd[r]);
+  dup2(fd[w], 1);
+  close(fd[w]);
+  execvp("mkvextract", child_argv);
+
+  delete[] child_argv;
+  _exit(127);
+
+  return NULL;
+}
+
+int run_mkvinfo(const char *infile, const char *logfile)
+{
+  int status;
+  int rv = 127;
+  pid_t id = fork();
+
+  if (id == 0) {
+    execlp("mkvinfo", "mkvinfo", "--ui-language", "en_US", "--redirect-output", logfile, infile, NULL);
+    _exit(127);
+  }
+
+  if (id > 0 && waitpid(id, &status, 0) > 0 && WIFEXITED(status) == 1) {
+    rv = WEXITSTATUS(status);
+  }
+
+  return rv;
 }
 

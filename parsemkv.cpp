@@ -124,24 +124,6 @@ inline static void pop_push_back(std::vector<std::string> &v, std::string s) {
 }
 */
 
-static int run_mkvinfo(const char *infile, const char *logfile)
-{
-  int status;
-  int rv = 127;
-  pid_t pid = fork();
-
-  if (pid == 0) {
-    execlp("mkvinfo", "mkvinfo", "--ui-language", "en_US", "--redirect-output", logfile, infile, NULL);
-    _exit(127);
-  }
-
-  if (pid > 0 && waitpid(pid, &status, 0) > 0 && WIFEXITED(status) == 1) {
-    rv = WEXITSTATUS(status);
-  }
-
-  return rv;
-}
-
 #define pop_push_back(v,s)  v.pop_back(); v.push_back(s)
 
 bool parsemkv(std::string file

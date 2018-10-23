@@ -164,41 +164,6 @@ CHECK_AGAIN:
   win->redraw();
 }
 
-FILE *popen_mkvextract(void)
-{
-  enum { r = 0, w = 1 };
-  int fd[2];
-  size_t len;
-  char **child_argv;
-
-  if (pipe(fd) == -1) {
-    return NULL;
-  }
-
-  if ((pid = fork()) != 0) {
-    close(fd[w]);
-    return fdopen(fd[r], "r");
-  }
-
-  len = args.size();
-  child_argv = new char *[len + 1];
-
-  for (size_t i = 0; i < len; i++) {
-    child_argv[i] = const_cast<char *>(args.at(i).c_str());
-  }
-  child_argv[len] = NULL;
-
-  close(fd[r]);
-  dup2(fd[w], 1);
-  close(fd[w]);
-  execvp("mkvextract", child_argv);
-
-  delete[] child_argv;
-  _exit(127);
-
-  return NULL;
-}
-
 static void rotate_cb(Fl_Widget *)
 {
   if (current_frame < last_frame) {
@@ -299,7 +264,7 @@ extern "C" void *run_extraction_command(void *)
   Fl::unlock();
   Fl::awake();
 
-  if ((fp = popen_mkvextract()) == NULL) {
+  if ((fp = popen_mkvextract(args, pid)) == NULL) {
     Fl::lock();
     progress_box->label(l);
     Fl::unlock();
@@ -347,20 +312,6 @@ extern "C" void *run_extraction_command(void *)
   Fl::awake();
 
   return nullptr;
-}
-
-/* replace all instances of »'« with »'\''« and put
- * single quotes around the string */
-static inline void quote_filename(std::string &s)
-{
-  size_t pos;
-  const size_t newlen = 4;  /* strlen("'\\''") */
-
-  for (pos = 0; (pos = s.find("'", pos)) != std::string::npos; pos += newlen) {
-    s.replace(pos, 1, "'\\''");
-  }
-  s.insert(0, 1, '\'');
-  s.push_back('\'');
 }
 
 bool create_extraction_command(bool extract)

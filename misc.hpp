@@ -28,6 +28,9 @@
 #include <string>
 
 void decode_uri(std::string &src);
+void quote_filename(std::string &s);
 bool file_is_matroska(const char *file);
+FILE *popen_mkvextract(std::vector<std::string> args);
+int run_mkvinfo(const char *infile, const char *logfile);
 
 #endif  /* MISC_HPP_INCLUDED */
