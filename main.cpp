@@ -26,7 +26,6 @@
 #include <FL/fl_ask.H>
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Button.H>
-#include <FL/Fl_Check_Browser.H>
 #include <FL/Fl_Check_Button.H>
 #include <FL/Fl_File_Chooser.H>
 #include <FL/Fl_Native_File_Chooser.H>
@@ -51,9 +50,10 @@
 
 #include "dnd.hpp"
 #include "misc.hpp"
+#include "mkvtoolnix/icon.h"
+#include "MyCheckBrowser.hpp"
 #include "parsemkv.hpp"
 #include "rotate.h"
-#include "mkvtoolnix/icon.h"
 
 Fl_RGB_Image *img_arr[] = {
   new Fl_PNG_Image(NULL, __0_png, __0_png_len),
@@ -78,7 +78,7 @@ const int but_h = 28;
 Fl_Double_Window *cmdWin = NULL;
 Fl_Text_Buffer *cmdBuff;
 
-Fl_Check_Browser *browser;
+MyCheckBrowser *browser;
 dnd_box *dnd_area;
 Fl_Button *but_outdir, *but_add, *but_extract, *but_abort, *but_cmd;
 Fl_Box *progress_box, *outdir_field, *infile_label, *rotate_img;
@@ -88,7 +88,7 @@ static void rotate_cb(Fl_Widget *);
 Fl_Timeout_Handler th = reinterpret_cast<Fl_Timeout_Handler>(rotate_cb);
 
 pthread_t pt;
-pid_t pid = -1;
+pid_t child_pid = -1;
 bool chapters = false, same_as_source = false;
 size_t count = 0, attach_count = 0;
 
@@ -217,7 +217,7 @@ static void browse_outdir_cb(Fl_Widget *)
   }
 }
 
-static void add_cb(Fl_Widget *)
+static void add_cb(Fl_Widget *, void *)
 {
   Fl_Native_File_Chooser *gtk;
   const char *file_;
@@ -264,7 +264,7 @@ extern "C" void *run_extraction_command(void *)
   Fl::unlock();
   Fl::awake();
 
-  if ((fp = popen_mkvextract(args, pid)) == NULL) {
+  if ((fp = popen_mkvextract(args, child_pid)) == NULL) {
     Fl::lock();
     progress_box->label(l);
     Fl::unlock();
@@ -285,7 +285,7 @@ extern "C" void *run_extraction_command(void *)
     if (line) {
       free(line);
     }
-    pid = -1;
+    child_pid = -1;
 
     if (pclose(fp) == 0) {
       l = "DONE";
@@ -525,9 +525,9 @@ static void extract_cb(Fl_Widget *) {
 
 static void abort_cb(Fl_Widget *)
 {
-  if (pid > getpid()) {
-    kill(pid, 1);
-    pid = -1;
+  if (child_pid > getpid()) {
+    kill(child_pid, 1);
+    child_pid = -1;
   }
   pthread_cancel(pt);
 
@@ -567,7 +567,7 @@ static void browser_cb(Fl_Widget *)
   }
 }
 
-static void close_cb(Fl_Widget *)
+static void close_cb(Fl_Widget *, void *)
 {
   pthread_cancel(pt);
 
@@ -577,6 +577,20 @@ static void close_cb(Fl_Widget *)
   win->hide();
 }
 
+static void select_all_cb(Fl_Widget *, void *) {
+  browser->check_all();
+  browser_cb(NULL);
+}
+
+static void select_none_cb(Fl_Widget *, void *) {
+  browser->check_none();
+  browser_cb(NULL);
+}
+
+static void dismiss_cb(Fl_Widget *, void *) {
+  /* do nothing; menu window will just close */
+}
+
 int main(int argc, char *argv[])
 {
   Fl_Box *dummy;
@@ -584,6 +598,15 @@ int main(int argc, char *argv[])
   char *current_dir;
 
   const int w = 800, h = 480, but_w = 110;
+
+  Fl_Menu_Item context_menu[] = {
+    { " Select all",      0, select_all_cb                         },
+    { " Select none",     0, select_none_cb, NULL, FL_MENU_DIVIDER },
+    { " Open file",       0, add_cb                                },
+    { " Close program  ", 0, close_cb,       NULL, FL_MENU_DIVIDER },
+    { " Dismiss",         0, dismiss_cb                            },
+    { 0 }
+  };
 
   if (argc > 1 && strcmp(argv[1], "--help") == 0) {
     std::cout << "usage: " << argv[0] << " [FILE]" << std::endl;
@@ -682,12 +705,10 @@ int main(int argc, char *argv[])
     g_top->resizable(infile_label);
     g_top->end();
 
-    browser = new Fl_Check_Browser(10, but_add->y() + but_add->h() + 5, w - 20, h - but_h*3 - 35);
-    browser->box(FL_THIN_DOWN_BOX);
-    browser->color(fl_lighter(fl_lighter(FL_BACKGROUND_COLOR)));
-    browser->clear_visible_focus();
+    browser = new MyCheckBrowser(10, but_add->y() + but_add->h() + 5, w - 20, h - but_h*3 - 35);
+    browser->menu(context_menu);
     browser->callback(browser_cb);
-    browser->when(FL_WHEN_CHANGED);
+    browser->clear_visible_focus();
 
     dnd_area = new dnd_box(browser->x(), browser->y(), browser->w(), browser->h());
     dnd_area->callback(dnd_callback);

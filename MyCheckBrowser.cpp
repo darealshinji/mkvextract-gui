@@ -22,15 +22,38 @@
  * SOFTWARE.
  */
 
-#ifndef MISC_HPP_INCLUDED
-#define MISC_HPP_INCLUDED
+#include <FL/Fl.H>
+#include <FL/Fl_Check_Browser.H>
+#include <FL/Fl_Menu_Item.H>
 
-#include <string>
+#include "MyCheckBrowser.hpp"
 
-void decode_uri(std::string &src);
-void quote_filename(std::string &str);
-bool file_is_matroska(const char *file);
-FILE *popen_mkvextract(std::vector<std::string> args, pid_t &child_pid);
-int run_mkvinfo(const char *infile, const char *logfile);
 
-#endif  /* MISC_HPP_INCLUDED */
+MyCheckBrowser::MyCheckBrowser(int X, int Y, int W, int H)
+ : Fl_Check_Browser(X, Y, W, H, NULL)
+{
+  box(FL_THIN_DOWN_BOX);
+  color(fl_lighter(fl_lighter(FL_BACKGROUND_COLOR)));
+  when(FL_WHEN_CHANGED);
+}
+
+MyCheckBrowser::~MyCheckBrowser() {
+  Fl_Check_Browser::clear();
+}
+
+int MyCheckBrowser::handle(int event)
+{
+  if (event == FL_PUSH) {
+    if (Fl::event_button() == FL_RIGHT_MOUSE) {
+      const Fl_Menu_Item *m = _menu->popup(Fl::event_x(), Fl::event_y());
+      if (m) {
+        m->do_callback(NULL);
+      }
+      return 1;
+    }
+    deselect();
+  }
+
+  return Fl_Check_Browser::handle(event);
+}
+

@@ -2,6 +2,7 @@
 
 #include "dnd.cpp"
 #include "misc.cpp"
+#include "MyCheckBrowser.cpp"
 #include "parsemkv.cpp"
 #include "main.cpp"
 

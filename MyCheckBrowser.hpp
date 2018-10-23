@@ -22,15 +22,27 @@
  * SOFTWARE.
  */
 
-#ifndef MISC_HPP_INCLUDED
-#define MISC_HPP_INCLUDED
+#ifndef MYCHECKBROWSER_HPP_INCLUDED
+#define MYCHECKBROWSER_HPP_INCLUDED
 
-#include <string>
+#include <FL/Fl.H>
+#include <FL/Fl_Check_Browser.H>
+#include <FL/Fl_Menu_Item.H>
 
-void decode_uri(std::string &src);
-void quote_filename(std::string &str);
-bool file_is_matroska(const char *file);
-FILE *popen_mkvextract(std::vector<std::string> args, pid_t &child_pid);
-int run_mkvinfo(const char *infile, const char *logfile);
+class MyCheckBrowser : public Fl_Check_Browser
+{
+  Fl_Menu_Item *_menu;
 
-#endif  /* MISC_HPP_INCLUDED */
+public:
+  MyCheckBrowser(int X, int Y, int W, int H);
+  ~MyCheckBrowser();
+
+  void menu(Fl_Menu_Item *m) { _menu = m; }
+  //Fl_Menu_Item *menu() { return _menu; }
+
+protected:
+  int handle(int e);
+};
+
+#endif  /* MYCHECKBROWSER_HPP_INCLUDED */
+

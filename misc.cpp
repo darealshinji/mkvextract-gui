@@ -51,16 +51,16 @@ void decode_uri(std::string &src)
 
 /* replace all instances of »'« with »'\''« and put
  * single quotes around the string */
-void quote_filename(std::string &s)
+void quote_filename(std::string &str)
 {
   size_t pos;
   const size_t newlen = 4;  /* strlen("'\\''") == 4 */
 
-  for (pos = 0; (pos = s.find("'", pos)) != std::string::npos; pos += newlen) {
-    s.replace(pos, 1, "'\\''");
+  for (pos = 0; (pos = str.find("'", pos)) != std::string::npos; pos += newlen) {
+    str.replace(pos, 1, "'\\''");
   }
-  s.insert(0, 1, '\'');
-  s.push_back('\'');
+  str.insert(0, 1, '\'');
+  str.push_back('\'');
 }
 
 bool file_is_matroska(const char *file)
@@ -93,7 +93,7 @@ bool file_is_matroska(const char *file)
   return false;
 }
 
-FILE *popen_mkvextract(const std::vector<std::string> args, pid_t &pid)
+FILE *popen_mkvextract(const std::vector<std::string> args, pid_t &child_pid)
 {
   enum { r = 0, w = 1 };
   int fd[2];
@@ -104,7 +104,7 @@ FILE *popen_mkvextract(const std::vector<std::string> args, pid_t &pid)
     return NULL;
   }
 
-  if ((pid = fork()) != 0) {
+  if ((child_pid = fork()) != 0) {
     close(fd[w]);
     return fdopen(fd[r], "r");
   }
