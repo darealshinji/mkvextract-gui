@@ -579,7 +579,7 @@ static void close_cb(Fl_Widget *)
 
 int main(int argc, char *argv[])
 {
-  Fl_Box *dummy1, *dummy2;
+  Fl_Box *dummy;
   Fl_Group *g, *g_top, *g_inside1, *g_inside2;
   char *current_dir;
 
@@ -638,28 +638,25 @@ int main(int argc, char *argv[])
       g_inside1 = new Fl_Group(0, but_extract->y(), w - 30 - 2*but_w, but_h);
       {
         progress_box = new Fl_Box(10, but_extract->y(), but_w, but_h);
+        progress_box->align(FL_ALIGN_CENTER|FL_ALIGN_INSIDE|FL_ALIGN_CLIP);
         progress_box->box(FL_THIN_DOWN_BOX);
 
         rotate_img = new Fl_Box(but_w + 15, progress_box->y(), but_h, but_h);
 
-        dummy1 = new Fl_Box(but_cmd->x() - 1, progress_box->y(), 1, 1);
-        dummy1->box(FL_NO_BOX);
+        dummy = new Fl_Box(but_cmd->x() - 1, progress_box->y(), 1, 1);
+        dummy->box(FL_NO_BOX);
       }
-      g_inside1->resizable(dummy1);
+      g_inside1->resizable(dummy);
       g_inside1->end();
 
       g_inside2 = new Fl_Group(0, g->y(), g_inside1->w(), but_h);
       {
         outdir_field = new Fl_Box(10, but_extract->y() - but_h - 5, g_inside2->w() - 10, but_h, outdir_manual.c_str());
-        outdir_field->align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE);
+        outdir_field->align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE|FL_ALIGN_CLIP);
         outdir_field->box(FL_THIN_DOWN_BOX);
       }
       g_inside2->resizable(outdir_field);
       g_inside2->end();
-
-      /* cover up the end of outdir_field */
-      { Fl_Box *o = new Fl_Box(outdir_field->x() + outdir_field->w(), outdir_field->y(), w - outdir_field->x(), outdir_field->h());
-       o->box(FL_FLAT_BOX); }
 
       check_outdir = new Fl_Check_Button(but_extract->x(), but_extract->y() - but_h - 5, but_w, but_h, " Use Source");
       check_outdir->deactivate();
@@ -674,23 +671,15 @@ int main(int argc, char *argv[])
 
     g_top = new Fl_Group(0, 0, w, but_h + 5);
     {
-      int but_add_x = w - 10 - but_w;
-
-      dummy2 = new Fl_Box(but_add_x - 1, 5, 1, 1);
-      dummy2->box(FL_NO_BOX);
-
-      infile_label = new Fl_Box(11, 5, but_add_x - 20, but_h, "(drag and drop a Matroska file)");
-      infile_label->align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE);
-      infile_label->labelsize(12);
-
-      /* cover up the end of infile_label */
-      { Fl_Box *o = new Fl_Box(but_add_x, 0, w - but_add_x, but_h + 5);
-       o->box(FL_FLAT_BOX); }
-
-      but_add = new Fl_Button(but_add_x, 5, but_w, but_h, "Open file");
+      but_add = new Fl_Button(w - 10 - but_w, 5, but_w, but_h, "Open file");
       but_add->callback(add_cb);
+
+      infile_label = new Fl_Box(11, 5, but_add->x() - 20, but_h, "(drag and drop a Matroska file)");
+      infile_label->align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE|FL_ALIGN_CLIP);
+      infile_label->box(FL_THIN_DOWN_BOX);
+      infile_label->labelsize(12);
     }
-    g_top->resizable(dummy2);
+    g_top->resizable(infile_label);
     g_top->end();
 
     browser = new Fl_Check_Browser(10, but_add->y() + but_add->h() + 5, w - 20, h - but_h*3 - 35);
