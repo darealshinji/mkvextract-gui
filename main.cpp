@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2018, djcj <djcj@gmx.de>
+ * Copyright (c) 2018-2019, djcj <djcj@gmx.de>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -54,6 +54,7 @@
 #include "MyCheckBrowser.hpp"
 #include "parsemkv.hpp"
 #include "rotate.h"
+#include "xml2ogm.hpp"
 
 Fl_RGB_Image *img_arr[] = {
   new Fl_PNG_Image(NULL, __0_png, __0_png_len),
@@ -89,13 +90,33 @@ Fl_Timeout_Handler th = reinterpret_cast<Fl_Timeout_Handler>(rotate_cb);
 
 pthread_t pt;
 pid_t child_pid = -1;
-bool chapters = false, same_as_source = false;
+bool chapters = false, same_as_source = false, extract_chapters = false;
 size_t count = 0, attach_count = 0;
 
 std::string file, outdir_auto, outdir_manual, command = "";
 std::vector<int> timestampIDs;
 std::vector<std::string> outnames, args;
 
+
+/* get basename without extension */
+std::string get_basename(void)
+{
+  std::string base = file;
+  std::size_t pos;
+
+  if ((pos = base.find_last_of('/')) != std::string::npos) {
+    base.erase(0, pos + 1);
+  }
+
+  if ((pos = base.find_last_of('.')) != std::string::npos) {
+    std::string s = base.substr(pos);
+    if (s == ".mkv" || s == ".mka" || s == ".mks" || s == ".mk3d" || s == ".webm") {
+      base.erase(pos);
+    }
+  }
+
+  return base;
+}
 
 void get_mkv_file_info(void)
 {
@@ -149,7 +170,7 @@ CHECK_AGAIN:
   }
 
   if (chapters) {
-    browser->add("Chapters");
+    browser->add("Chapters (xml and ogm/txt)");
   }
   browser->add("Video timestamps");
   browser->add("Tags");
@@ -245,6 +266,7 @@ static void add_cb(Fl_Widget *, void *)
 extern "C" void *run_extraction_command(void *)
 {
   FILE *fp;
+  std::string base, xml, ogm;
   char *line = NULL;
   size_t n = 0;
   const char *l = "ERROR";
@@ -267,6 +289,7 @@ extern "C" void *run_extraction_command(void *)
   if ((fp = popen_mkvextract(args, child_pid)) == NULL) {
     Fl::lock();
     progress_box->label(l);
+    extract_chapters = false;
     Fl::unlock();
     Fl::awake();
   }
@@ -311,6 +334,28 @@ extern "C" void *run_extraction_command(void *)
   Fl::unlock();
   Fl::awake();
 
+  if (chapters && extract_chapters) {
+    base = get_basename();
+
+    if (same_as_source) {
+      base = outdir_auto + base;
+    } else {
+      base = outdir_manual + base;
+    }
+
+    xml = base + " - chapters.xml";
+    ogm = base + " - chapters.txt";
+
+    if (!xml2ogm(xml.c_str(), ogm.c_str())) {
+      Fl::lock();
+      fl_close = "   OK ";
+      fl_message_title("Warning");
+      fl_message("%s", "Could not create OGM format chapters from XML!");
+      Fl::unlock();
+      Fl::awake();
+    }
+  }
+
   return nullptr;
 }
 
@@ -318,26 +363,15 @@ bool create_extraction_command(bool extract)
 {
   bool has_tracks = false, has_attach = false;
   std::string base, attach_dir;
-  std::size_t pos;
   size_t timestamps_entry, tags_entry, chapters_entry;
+
+  extract_chapters = false;
 
   if (file.empty() || file.length() == 0) {
     return false;
   }
 
-  /* get basename without extension */
-  base = file;
-
-  if ((pos = base.find_last_of('/')) != std::string::npos) {
-    base.erase(0, pos + 1);
-  }
-
-  if ((pos = base.find_last_of('.')) != std::string::npos) {
-    std::string s = base.substr(pos);
-    if (s == ".mkv" || s == ".mka" || s == ".mks" || s == ".mk3d" || s == ".webm") {
-      base.erase(pos);
-    }
-  }
+  base = get_basename();
 
   if (extract) {
     args.clear();
@@ -427,6 +461,7 @@ bool create_extraction_command(bool extract)
       if (extract) {
         args.push_back("chapters");
         args.push_back(s);
+        extract_chapters = true;
       } else {
         quote_filename(s);
         command += " chapters " + s;

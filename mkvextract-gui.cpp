@@ -4,5 +4,6 @@
 #include "misc.cpp"
 #include "MyCheckBrowser.cpp"
 #include "parsemkv.cpp"
+#include "xml2ogm.cpp"
 #include "main.cpp"
 

@@ -7,8 +7,8 @@ First download FLTK verson 1.3 or 1.4 with either svn or git:
 ``` sh
 svn co --username "" --password "" http://seriss.com/public/fltk/fltk/branches/branch-1.3/ fltk
 svn co --username "" --password "" http://seriss.com/public/fltk/fltk/branches/branch-1.4/ fltk
-git clone --branch branch-1.3 https://github.com/fltk/test-only fltk
-git clone --branch branch-1.4 https://github.com/fltk/test-only fltk
+git clone --branch branch-1.3 https://github.com/fltk/fltk
+git clone https://github.com/fltk/fltk
 ```
 
 Then build FLTK and use fltk-config:
@@ -22,7 +22,7 @@ cmake .. \
 	-DOPTION_CAIRO=OFF \
 	-DOPTION_CAIROEXT=OFF \
 	-DOPTION_OPTIM="-Wall -O3" \
-	-DOPTION_PRINT_SUPPORT=OFF \
+	-DOPTION_PRINT_SUPPORT=ON \
 	-DOPTION_USE_GL=OFF \
 	-DOPTION_USE_PANGO=OFF \
 	-DOPTION_USE_THREADS=ON \
