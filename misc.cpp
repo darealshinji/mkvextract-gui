@@ -67,7 +67,7 @@ bool file_is_matroska(const char *file)
 {
   FILE *fp;
   size_t len;
-  unsigned char bytes[32] = {0};
+  unsigned char bytes[4] = {0};
 
   if (!file || !(fp = fopen(file, "r"))) {
     return false;
@@ -81,13 +81,7 @@ bool file_is_matroska(const char *file)
   }
   fclose(fp);
 
-  /**
-   * See /usr/share/mime/packages/freedesktop.org.xml
-   * or https://cgit.freedesktop.org/xdg/shared-mime-info/tree/freedesktop.org.xml.in
-   */
-  if (memcmp(bytes, "\x1A\x45\xDF\xA3", 4) == 0 && memcmp(bytes+21, "\x42\x82", 2) == 0 &&
-      (memcmp(bytes+24, "matroska", 8) == 0 || memcmp(bytes+24, "webm", 4) == 0))
-  {
+  if (memcmp(bytes, "\x1A\x45\xDF\xA3", 4) == 0) {
     return true;
   }
   return false;
