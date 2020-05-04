@@ -30,25 +30,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-void decode_uri(std::string &src)
-{
-  std::string dest;
-  int n;
-
-  for (size_t i = 0; i < src.length(); i++) {
-    if (src[i] == '%') {
-      if (sscanf(src.substr(i + 1, 2).c_str(), "%2X", &n) != 1) {
-        break;
-      }
-      dest += static_cast<char>(n);
-      i += 2;
-    } else {
-      dest += src[i];
-    }
-  }
-  src = dest;
-}
-
 /* replace all instances of »'« with »'\''« and put
  * single quotes around the string */
 void quote_filename(std::string &str)

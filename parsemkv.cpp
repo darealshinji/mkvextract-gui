@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2018, djcj <djcj@gmx.de>
+ * Copyright (c) 2018, 2020, djcj <djcj@gmx.de>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -33,7 +33,7 @@
 
 #include "misc.hpp"
 
-static const std::string codecList[][2] = {
+static const char *codecList[][2] = {
   { "V_MS/VFW/FOURCC", "vfw" },
   { "V_UNCOMPRESSED", "raw" },
   { "V_MPEG4/ISO/AVC", "avc" },
@@ -145,6 +145,11 @@ bool parsemkv(std::string file
   if (mkstemp(stats) == -1) {
     error = "cannot create temporary file:\n";
     error.append(stats);
+    return false;
+  }
+
+  if (system("mkvinfo --version 2>/dev/null >/dev/null") != 0) {
+    error = "mkvinfo doesn't seem to be in PATH!";
     return false;
   }
 

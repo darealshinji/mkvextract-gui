@@ -139,8 +139,7 @@ CHECK_AGAIN:
   }
 
   if (!parsemkv(file, tracks, names1, attachments, names2, timestampIDs, chapters, error)) {
-    fl_close = "   OK ";
-    fl_message_title("Warning");
+    fl_message_title("Error");
     fl_message("%s", error.c_str());
     return;
   }
@@ -206,8 +205,10 @@ static void dnd_callback(Fl_Widget *)
       (pos = items.find_first_of('\n')) != std::string::npos)
   {
     items.erase(pos);
-    decode_uri(items);
-    file = items.erase(0, 7);
+    char *ch = strdup(items.c_str());
+    fl_decode_uri(ch);
+    file = ch + 7;
+    free(ch);
     dnd_area->deactivate();
     get_mkv_file_info();
     dnd_area->activate();
@@ -348,8 +349,7 @@ extern "C" void *run_extraction_command(void *)
 
     if (!xml2ogm(xml.c_str(), ogm.c_str())) {
       Fl::lock();
-      fl_close = "   OK ";
-      fl_message_title("Warning");
+      fl_message_title("Error");
       fl_message("%s", "Could not create OGM format chapters from XML!");
       Fl::unlock();
       Fl::awake();
@@ -552,7 +552,14 @@ static void cmd_cb(Fl_Widget *)
   }
 }
 
-static void extract_cb(Fl_Widget *) {
+static void extract_cb(Fl_Widget *)
+{
+  if (system("mkvextract --version 2>/dev/null >/dev/null") != 0) {
+    fl_message_title("Error");
+    fl_message("%s", "mkvextract doesn't seem to be in PATH!");
+    return;
+  }
+
   if (create_extraction_command(true)) {
     pthread_create(&pt, NULL, &run_extraction_command, NULL);
   }
