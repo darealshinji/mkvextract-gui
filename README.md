@@ -32,6 +32,7 @@ make install
 
 cd ../..
 ./fltk/build/usr/bin/fltk-config --use-images --compile mkvextract-gui.cpp
+strip mkvextract-gui
 ```
 
 You can create a .mkv file for testing:

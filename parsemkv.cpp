@@ -31,8 +31,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "misc.hpp"
-
 static const char *codecList[][2] = {
   { "V_MS/VFW/FOURCC", "vfw" },
   { "V_UNCOMPRESSED", "raw" },
@@ -117,16 +115,9 @@ inline static bool checkLine(std::string &line, const std::string str)
   return false;
 }
 
-/*
-inline static void pop_push_back(std::vector<std::string> &v, std::string s) {
-  v.pop_back();
-  v.push_back(s);
-}
-*/
-
 #define pop_push_back(v,s)  v.pop_back(); v.push_back(s)
 
-bool parsemkv(std::string file
+bool parsemkv(std::string file_quoted
 ,             std::vector<std::string> &trackInfos
 ,             std::vector<std::string> &trackFilenames
 ,             std::vector<std::string> &attachmentInfos
@@ -138,7 +129,7 @@ bool parsemkv(std::string file
   std::ifstream ifs;
   std::vector<std::string> codecid, duration, name, language, width, height,
     freq, channels, filename, mime, fdata;
-  std::string line;
+  std::string line, cmd;
 
   char stats[] = "/tmp/mkvinfo-stats-XXXXXX";
 
@@ -153,7 +144,11 @@ bool parsemkv(std::string file
     return false;
   }
 
-  if (run_mkvinfo(file.c_str(), stats) != 0) {
+  cmd = "mkvinfo --ui-language en_US --redirect-output ";
+  cmd += stats;
+  cmd += " " + file_quoted;
+
+  if (system(cmd.c_str()) != 0) {
     error = "mkvinfo has returned an error";
     return false;
   }

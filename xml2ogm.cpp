@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2019, djcj <djcj@gmx.de>
+ * Copyright (c) 2019-2020, djcj <djcj@gmx.de>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -21,12 +21,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-
-#include <iomanip>
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <string.h>
 
 /** MKVToolnix XML format:
 <Chapters>
@@ -50,112 +44,158 @@ CHAPTER02=00:21:34.534
 CHAPTER02NAME=Chapter 02
 **/
 
+#include <iostream>
+#include <fstream>
+#include <string.h>
+#include <stdio.h>
+#include "tinyxml2.h"
 
-static bool read_file(const char *file, std::string &str)
-{
-  char *buf;
-  size_t len;
-  std::ifstream fs;
-  str = "";
-
-  fs.open(file);
-
-  if (!fs.is_open()) {
-    return false;
-  }
-
-  fs.seekg(0, fs.end);
-  len = fs.tellg();
-
-  if (len > 1024*1024) {
-    len = 1024*1024;
-  }
-  fs.seekg(0, fs.beg);
-
-  buf = new char[len];
-  fs.read(buf, len);
-  fs.close();
-
-  buf[len] = '\0';
-  str = std::string(buf);
-  delete[] buf;
-
-  return true;
-}
-
-static std::string get_content(const std::string element, const std::string str, size_t *pos)
-{
-  size_t beg = str.find("<" + element + ">");
-  size_t end = str.find("</" + element + ">");
-
-  if (beg == std::string::npos || end == std::string::npos || beg > end) {
-    *pos = 0;
-    return "";
-  }
-
-  *pos = end + element.length() + 3;
-  beg += element.length() + 2;
-
-  return str.substr(beg, end - beg);
-}
 
 bool xml2ogm(const char *input, const char *output)
 {
-  size_t pos = 0;
-  std::string xml;
-  std::stringstream ogm;
-  std::ofstream fs;
+  std::string ogm;
+  std::ofstream ofs;
+  tinyxml2::XMLDocument xmlDoc;
+  tinyxml2::XMLElement *p, *pEE, *pCA;
+  int val;
 
   if (!input || !output || strlen(input) < 1 || strlen(output) < 1) {
     return false;
   }
 
-  if (!read_file(input, xml)) {
+  if (xmlDoc.LoadFile(input) != tinyxml2::XML_SUCCESS) {
     return false;
   }
 
-  if ((xml = get_content("Chapters", xml, &pos)) == "" ||
-      (xml = get_content("EditionEntry", xml, &pos)) == "")
+  p = xmlDoc.FirstChildElement("Chapters");
+  if (!p) {
+    return false;
+  }
+
+  /* EditionEntry */
+
+  pEE = p->FirstChildElement("EditionEntry");
+
+  while (pEE) {
+    val = 0;
+    p = pEE->FirstChildElement("EditionFlagHidden");
+
+    if (!p || p->QueryIntText(&val) != tinyxml2::XML_SUCCESS || val == 0) {
+      break;
+    }
+    pEE = pEE->NextSiblingElement("EditionEntry");
+  }
+
+  if (!pEE) {
+    return false;
+  }
+
+  /* ChapterAtom */
+
+  pCA = pEE->FirstChildElement("ChapterAtom");
+  if (!pCA) {
+    return false;
+  }
+
+  for (int i = 1; pCA != nullptr && i < 100; ++i,
+       pCA = pCA->NextSiblingElement("ChapterAtom"))
   {
-    return false;
-  }
+    int h, m;
+    float s;
+    const char *label, *time, *fmt;
+    char buf[64];
+    tinyxml2::XMLElement *pCD;
 
-  for (int n = 1; n < 100; n++) {
-    std::string atom, str;
-    std::stringstream ss;
-
-    if ((atom = get_content("ChapterAtom", xml, &pos)) == "") {
-      break;
+    /* hidden flag */
+    val = 0;
+    p = pCA->FirstChildElement("ChapterFlagHidden");
+    if (p && (p->QueryIntText(&val) != tinyxml2::XML_SUCCESS || val != 0)) {
+      continue;
     }
 
-    xml.erase(0, pos);
-
-    if ((str = get_content("ChapterTimeStart", atom, &pos)) == "") {
-      break;
+    /* enabled flag */
+    val = 1;
+    p = pCA->FirstChildElement("ChapterFlagEnabled");
+    if (p && (p->QueryIntText(&val) != tinyxml2::XML_SUCCESS || val != 1)) {
+      continue;
     }
 
-    ss << "CHAPTER" << std::setw(2) << std::setfill('0') << n;
-    ogm << ss.str() << "=" << str.substr(0, 12) << std::endl << ss.str() << "NAME=";
+    /* chapter title */
+    pCD = pCA->FirstChildElement("ChapterDisplay");
 
-    if ((str = get_content("ChapterDisplay", atom, &pos)) != "" && (str = get_content("ChapterString", str, &pos)) != "") {
-      ogm << str << std::endl;
+    while (pCD) {
+      const char *lang = NULL, *text = NULL;
+
+      p = pCD->FirstChildElement("ChapterString");
+      if (p) {
+        text = p->GetText();
+      }
+
+      p = pCD->FirstChildElement("ChapterLanguage");
+      if (p) {
+        lang = p->GetText();
+      }
+
+      if (text && !label) {
+        label = text;
+      }
+
+      /* prefer English entries */
+      if (text && lang && strcmp("eng", lang) == 0) {
+        label = text;
+        break;
+      }
+
+      pCD = pCD->NextSiblingElement("ChapterDisplay");
+    }
+
+    /* chapter time */
+    p = pCA->FirstChildElement("ChapterTimeStart");
+    if (!p) {
+      return false;
+    }
+
+    time = p->GetText();
+    if (!time) {
+      return false;
+    }
+
+    if (sscanf(time, "%d:%d:%f", &h, &m, &s) != 3) {
+      return false;
+    }
+
+    /* check time limits */
+    if (h<0||h>99 || m<0||m>59 || s<0||s>=60) {
+      return false;
+    }
+
+    /* append ogm entries */
+    if (label) {
+      fmt = "CHAPTER%02d=%02d:%02d:%06.3f\nCHAPTER%02dNAME=";
+      snprintf(buf, sizeof(buf) - 1, fmt, i, h, m, s, i);
+      ogm += buf;
+      ogm += label;
+      ogm.push_back('\n');
     } else {
-      ogm << "Chapter " << n << std::endl;
+      fmt = "CHAPTER%02d=%02d:%02d:%06.3f\nCHAPTER%02dNAME=Chapter %02d\n";
+      snprintf(buf, sizeof(buf) - 1, fmt, i, h, m, s, i, i);
+      ogm += buf;
     }
   }
 
-  if (ogm.str().length() < 1) {
+  if (ogm.empty()) {
     return false;
   }
 
-  fs.open(output);
+  ofs.open(output);
 
-  if (!fs.is_open()) {
+  if (!ofs.is_open()) {
     return false;
   }
 
-  fs.write(ogm.str().c_str(), ogm.str().length());
-  fs.close();
+  ofs.write(ogm.c_str(), ogm.length());
+  ofs.close();
 
   return true;
 }
+
