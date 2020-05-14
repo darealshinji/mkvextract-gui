@@ -758,14 +758,16 @@ int main(int argc, char *argv[])
 
   if (argc > 1) {
     if (fl_filename_isdir(argv[1])) {
-      std::cerr << "error: `" << argv[1] << "' is a directory" << std::endl;
+      fl_message_title("Error");
+      fl_message("`%s' is a directory!", argv[1]);
     } else if (access(argv[1], R_OK) == 0) {
       file = std::string(argv[1]);
       dnd_area->deactivate();
       get_mkv_file_info();
       dnd_area->activate();
     } else {
-      std::cerr << "error: cannot read file `" << argv[1] << "'" << std::endl;
+      fl_message_title("Error");
+      fl_message("cannot read file `%s'", argv[1]);
     }
   }
 
