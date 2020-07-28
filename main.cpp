@@ -55,8 +55,6 @@
 #include "rotate.h"
 #include "xml2ogm.hpp"
 
-#define STRTOVOIDP(x) reinterpret_cast<void *>(const_cast<char *>(x.c_str()))
-
 static Fl_RGB_Image *img_arr[] = {
   new Fl_PNG_Image(NULL, __0_png, __0_png_len),
   new Fl_PNG_Image(NULL, __1_png, __1_png_len),
@@ -68,28 +66,32 @@ static Fl_RGB_Image *img_arr[] = {
   new Fl_PNG_Image(NULL, __7_png, __7_png_len)
 };
 
+/* needed function declarations */
+static std::string create_extraction_command(bool extract);
+static void abort_cb(Fl_Widget *);
+static void extract_cb(Fl_Widget *);
+static void rotate_cb(Fl_Widget *);
+
 static const float img_duration = 0.1;  /* seconds */
 static const int last_frame = 7;
 static int current_frame = 0;
 
-static Fl_Double_Window *win;
+static Fl_Double_Window *win = NULL;
 static int max_w, max_h;
 static const int but_h = 28;
 
-/* "command line" subwindow */
 static Fl_Double_Window *cmdWin = NULL;
 static Fl_Text_Buffer *cmdBuff;
 
 static MyCheckBrowser *browser;
 static dnd_box *dnd_area;
-static Fl_Button *but_outdir, *but_add, *but_extract, *but_abort, *but_cmd;
+static Fl_Button *but_outdir, *but_add, *but_extract, *but_cmd;
 static Fl_Box *progress_box, *outdir_field, *infile_label, *rotate_img;
 static Fl_Check_Button *check_outdir;
 
-static void rotate_cb(Fl_Widget *);
 static Fl_Timeout_Handler th = reinterpret_cast<Fl_Timeout_Handler>(rotate_cb);
 
-static pthread_t pt;
+static pthread_t tcom, tinfo;
 static pid_t child_pid = -1;
 static bool chapters = false, same_as_source = false, extract_chapters = false;
 static size_t count = 0, attach_count = 0;
@@ -97,14 +99,52 @@ static size_t count = 0, attach_count = 0;
 static std::string file, outdir_auto, outdir_manual;
 static std::vector<int> timestampIDs;
 static std::vector<std::string> outnames;
+static std::vector<std::string> args;
 
+
+static FILE *popen_mkvextract(void)
+{
+  enum { r = 0, w = 1 };
+  int fd[2];
+  size_t len = args.size();
+  //char **child_argv;
+  char *child_argv[len + 1];
+
+  if (pipe(fd) == -1) {
+    return NULL;
+  }
+
+  if ((child_pid = fork()) != 0) {
+    close(fd[w]);
+    return fdopen(fd[r], "r");
+  }
+
+  //len = args.size();
+  //child_argv = new char *[len + 1];
+
+  for (size_t i = 0; i < len; i++) {
+    child_argv[i] = const_cast<char *>(args.at(i).c_str());
+  }
+  child_argv[len] = NULL;
+
+  close(fd[r]);
+  dup2(fd[w], 1);
+  close(fd[w]);
+  execvp("mkvextract", child_argv);
+
+  //delete[] child_argv;
+  _exit(127);
+
+  return NULL;
+}
 
 /* replace all instances of »'« with »'\''« and put
  * single quotes around the string */
-static std::string quote_filename(std::string str)
+static std::string quote_filename(const std::string in)
 {
   size_t pos;
   const size_t newlen = 4;  /* strlen("'\\''") == 4 */
+  std::string str = in;
 
   for (pos = 0; (pos = str.find("'", pos)) != std::string::npos; pos += newlen) {
     str.replace(pos, 1, "'\\''");
@@ -158,30 +198,58 @@ static bool file_is_matroska(void)
   return false;
 }
 
-static void get_mkv_file_info(void)
+extern "C" void *get_mkv_file_info(void *)
 {
   std::vector<std::string> tracks, attachments, names1, names2;
   std::string error;
   std::size_t pos;
 
+  Fl::lock();
+
+  dnd_area->deactivate();
+  but_add->deactivate();
+
+  Fl::unlock();
+  Fl::awake();
+
 CHECK_AGAIN:
 
   if (!file_is_matroska()) {
+    Fl::lock();
+
     fl_message_title("Warning");
     int rv = fl_choice("The selected file is not of type Matroska or WebM.\n"
                        "Do you want to continue anyway?",
                        "   Stop   ", "Continue", "Try again");
+
+    Fl::unlock();
+    Fl::awake();
+
     if (rv == 0) {
-      return;
+      Fl::lock();
+
+      dnd_area->activate();
+      but_add->activate();
+
+      Fl::unlock();
+      Fl::awake();
+      return nullptr;
     } else if (rv == 2) {
       goto CHECK_AGAIN;
     }
   }
 
   if (!parsemkv(quote_filename(file), tracks, names1, attachments, names2, timestampIDs, chapters, error)) {
+    Fl::lock();
+
     fl_message_title("Error");
     fl_message("%s", error.c_str());
-    return;
+    dnd_area->activate();
+    but_add->activate();
+
+    Fl::unlock();
+    Fl::awake();
+    return nullptr;
   }
 
   /* get dirname */
@@ -194,19 +262,33 @@ CHECK_AGAIN:
   }
 
   outnames.clear();
-  browser->clear();
   count = tracks.size();
   attach_count = attachments.size();
 
+  Fl::lock();
+  browser->clear();
+  Fl::unlock();
+  Fl::awake();
+
   for (size_t i = 0; i < count; i++) {
+    Fl::lock();
     browser->add(tracks.at(i).c_str());
+    Fl::unlock();
+    Fl::awake();
+
     outnames.push_back(names1.at(i));
   }
 
   for (size_t i = 0; i < attach_count; i++) {
+    Fl::lock();
     browser->add(attachments.at(i).c_str());
+    Fl::unlock();
+    Fl::awake();
+
     outnames.push_back(names2.at(i));
   }
+
+  Fl::lock();
 
   if (chapters) {
     browser->add("Chapters (xml and ogm/txt)");
@@ -214,14 +296,21 @@ CHECK_AGAIN:
   browser->add("Video timestamps");
   browser->add("Tags");
 
+  infile_label->copy_label(file.c_str());
+  check_outdir->activate();
+  dnd_area->activate();
+  but_add->activate();
+  win->redraw();
+
+  Fl::unlock();
+  Fl::awake();
+
   tracks.clear();
   names1.clear();
   attachments.clear();
   names2.clear();
 
-  infile_label->copy_label(file.c_str());
-  check_outdir->activate();
-  win->redraw();
+  return nullptr;
 }
 
 static void rotate_cb(Fl_Widget *)
@@ -249,9 +338,7 @@ static void dnd_callback(Fl_Widget *)
     fl_decode_uri(ch);
     file = ch + 7;
     free(ch);
-    dnd_area->deactivate();
-    get_mkv_file_info();
-    dnd_area->activate();
+    pthread_create(&tinfo, NULL, &get_mkv_file_info, NULL);
   }
 }
 
@@ -281,30 +368,17 @@ static void browse_outdir_cb(Fl_Widget *)
 
 static void add_cb(Fl_Widget *, void *)
 {
-  Fl_Native_File_Chooser *gtk;
-  const char *file_;
-
-  gtk = new Fl_Native_File_Chooser(Fl_Native_File_Chooser::BROWSE_FILE);
+  Fl_Native_File_Chooser *gtk = new Fl_Native_File_Chooser(Fl_Native_File_Chooser::BROWSE_FILE);
   gtk->title("Select a file");
   gtk->filter("*.mkv|*.mk3d|*.mka|*.mks|*.webm");
 
-  if (gtk->show() != 0) {
-    return;
+  if (gtk->show() == 0 && gtk->filename() != NULL) {
+    file = std::string(gtk->filename());
+    pthread_create(&tinfo, NULL, &get_mkv_file_info, NULL);
   }
-  file_ = gtk->filename();
-
-  if (!file_) {
-    return;
-  }
-
-  file = std::string(file_);
-
-  dnd_area->deactivate();
-  get_mkv_file_info();
-  dnd_area->activate();
 }
 
-extern "C" void *run_extraction_command(void *v)
+extern "C" void *run_extraction_command(void *)
 {
   FILE *fp;
   std::string base, xml, ogm;
@@ -314,9 +388,23 @@ extern "C" void *run_extraction_command(void *v)
   const char *keyword = "#GUI#progress ";
   const size_t keyword_len = 14;
 
-  if (!v) {
+  if (child_pid > getpid()) {
+    kill(child_pid, 1);
+    child_pid = -1;
+  }
+
+  if (system("mkvextract --version 2>/dev/null >/dev/null") != 0) {
+    Fl::lock();
+
+    fl_message_title("Error");
+    fl_message("%s", "mkvextract doesn't seem to be in PATH!");
+
+    Fl::unlock();
+    Fl::awake();
     return nullptr;
   }
+
+  create_extraction_command(true);
 
   Fl::lock();
 
@@ -324,13 +412,14 @@ extern "C" void *run_extraction_command(void *v)
   check_outdir->deactivate();
   but_outdir->deactivate();
   but_add->deactivate();
-  but_abort->show();
+  but_extract->label("Abort");
+  but_extract->callback(abort_cb);
   Fl::add_timeout(img_duration, th);
 
   Fl::unlock();
   Fl::awake();
 
-  if ((fp = popen(reinterpret_cast<const char *>(v), "re")) == NULL) {
+  if ((fp = popen_mkvextract()) == NULL) {
     Fl::lock();
     progress_box->label("ERROR");
     extract_chapters = false;
@@ -360,15 +449,14 @@ extern "C" void *run_extraction_command(void *v)
     Fl::awake();
   }
 
-  free(v);
-
   Fl::lock();
 
   dnd_area->activate();
   check_outdir->activate();
   but_outdir->activate();
   but_add->activate();
-  but_abort->hide();
+  but_extract->label("Extract");
+  but_extract->callback(extract_cb);
 
   Fl::remove_timeout(th);
   rotate_img->image(NULL);
@@ -400,20 +488,28 @@ extern "C" void *run_extraction_command(void *v)
   return nullptr;
 }
 
-static std::string create_extraction_command(void)
+static std::string create_extraction_command(bool extract)
 {
   bool has_tracks = false, has_attach = false;
   std::string command, base, attach_dir;
   size_t timestamps_entry, tags_entry, chapters_entry;
 
   extract_chapters = false;
+  args.clear();
 
-  if (file.empty() || file.length() == 0) {
-    return "";
-  }
-
-  command = "mkvextract " + quote_filename(file);
   base = get_basename();
+
+  if (extract) {
+    args.push_back("mkvextract");
+    args.push_back(file);
+    args.push_back("--ui-language");
+    args.push_back("en_US");
+    args.push_back("--gui-mode");
+  } else {
+    //std::string s = file;
+    //quote_filename(s);
+    command = "mkvextract " + quote_filename(file);
+  }
 
   if (same_as_source) {
     base = outdir_auto + base;
@@ -426,12 +522,24 @@ static std::string create_extraction_command(void)
     if (browser->checked(i+1)) {
       if (!has_tracks) {
         has_tracks = true;
-        command += " tracks";
+
+        if (extract) {
+          args.push_back("tracks");
+        } else {
+          command += " tracks";
+        }
       }
 
       std::stringstream ss;
       ss << i << ":" << base << " - " << outnames.at(i);
-      command += " " + quote_filename(ss.str());
+
+      if (extract) {
+        args.push_back(ss.str());
+      } else {
+        //std::string s = ss.str();
+        //quote_filename(s);
+        command += " " + quote_filename(ss.str());
+      }
     }
   }
 
@@ -443,12 +551,24 @@ static std::string create_extraction_command(void)
       if (browser->checked(i+count+1)) {
         if (!has_attach) {
           has_attach = true;
-          command += " attachments";
+
+          if (extract) {
+            args.push_back("attachments");
+          } else {
+            command += " attachments";
+          }
         }
 
         std::stringstream ss;
         ss << i+1 << ":" << attach_dir << outnames.at(i+count);
-        command += " " + quote_filename(ss.str());
+
+        if (extract) {
+          args.push_back(ss.str());
+        } else {
+          //std::string s = ss.str();
+          //quote_filename(s);
+          command += " " + quote_filename(ss.str());
+        }
       }
     }
   }
@@ -463,43 +583,69 @@ static std::string create_extraction_command(void)
     tags_entry++;
 
     if (browser->checked(chapters_entry)) {
-      extract_chapters = true;
-      command += " chapters " + quote_filename(base + " - chapters.xml");
+      std::string s = base + " - chapters.xml";
+
+      if (extract) {
+        args.push_back("chapters");
+        args.push_back(s);
+        extract_chapters = true;
+      } else {
+        //quote_filename(s);
+        command += " chapters " + quote_filename(s);
+      }
     }
   }
 
   /* timestamps */
   if (browser->checked(timestamps_entry) && timestampIDs.size() > 0) {
-    command += " timestamps_v2";
+    if (extract) {
+      args.push_back("timestamps_v2");
+    } else {
+      command += " timestamps_v2";
+    }
 
     for (size_t i = 0; i < timestampIDs.size(); i++) {
       int id = timestampIDs.at(i);
       std::stringstream ss;
       ss << id << ":" << base << " - track_" << id+1 << "_video_timestamps_v2.txt";
-      command += " " + quote_filename(ss.str());
+
+      if (extract) {
+        args.push_back(ss.str());
+      } else {
+        //std::string s = ss.str();
+        //quote_filename(s);
+        command += " " + quote_filename(ss.str());
+      }
     }
   }
 
   /* tags */
   if (browser->checked(tags_entry)) {
-    command += " tags " + quote_filename(base + " - tags.xml");
+    std::string s = base + " - tags.xml";
+
+    if (extract) {
+      args.push_back("tags");
+      args.push_back(s);
+    } else {
+      //quote_filename(s);
+      command += " tags " + quote_filename(s);
+    }
   }
 
   return command;
 }
 
-static void clipboard_cb(Fl_Widget *, void *v)
-{
-  if (!v) {
-    return;
-  }
-
-  const char *cmd = reinterpret_cast<const char *>(v);
-  Fl::copy(cmd, strlen(cmd), 1);
+static void clipboard_cb(Fl_Widget *) {
+  char *text = cmdBuff->text();
+  Fl::copy(text, cmdBuff->length(), 1);
+  free(text);
 }
 
-static void close_cmdWin_cb(Fl_Widget *) {
-  cmdWin->hide();
+static void close_cmdWin_cb(Fl_Widget *)
+{
+  if (cmdWin && cmdWin->shown()) {
+    cmdWin->hide();
+  }
 }
 
 static void cmd_cb(Fl_Widget *)
@@ -508,12 +654,7 @@ static void cmd_cb(Fl_Widget *)
   Fl_Button *but_copy, *but_close;
   Fl_Box *dummy;
   Fl_Group *g;
-
-  std::string cmd = create_extraction_command();
-
-  if (cmd == "") {
-    return;
-  }
+  std::string command;
 
   if (!cmdWin) {
     cmdWin = new Fl_Double_Window(640, 320, "Command line");
@@ -528,7 +669,7 @@ static void cmd_cb(Fl_Widget *)
         but_close = new Fl_Button(cmdWin->w() - 110 - 15, disp->h() + disp->y() + 6, 110, but_h, "Close");
         but_close->callback(close_cmdWin_cb);
         but_copy = new Fl_Button(but_close->x() - 150 - 5, but_close->y(), 150, but_h, "Copy to clipboard");
-        but_copy->callback(clipboard_cb, STRTOVOIDP(cmd));
+        but_copy->callback(clipboard_cb);
         dummy = new Fl_Box(but_copy->x() - 1, but_copy->y(), 1, 1);
       }
       g->end();
@@ -538,26 +679,14 @@ static void cmd_cb(Fl_Widget *)
     cmdWin->resizable(disp);
   }
 
-  cmdBuff->text(cmd.c_str());
+  command = create_extraction_command(false);
+  cmdBuff->text(command.c_str());
   cmdWin->show();
 }
 
-static void extract_cb(Fl_Widget *)
-{
-  if (system("mkvextract --version 2>/dev/null >/dev/null") != 0) {
-    fl_message_title("Error");
-    fl_message("%s", "mkvextract doesn't seem to be in PATH!");
-    return;
-  }
-
-  std::string cmd = create_extraction_command();
-
-  if (cmd == "") {
-    return;
-  }
-  cmd += " --ui-language en_US --gui-mode";
-
-  pthread_create(&pt, NULL, &run_extraction_command, reinterpret_cast<void *>(strdup(cmd.c_str())));
+static void extract_cb(Fl_Widget *) {
+  close_cmdWin_cb(NULL);
+  pthread_create(&tcom, NULL, &run_extraction_command, NULL);
 }
 
 static void abort_cb(Fl_Widget *)
@@ -566,13 +695,14 @@ static void abort_cb(Fl_Widget *)
     kill(child_pid, 1);
     child_pid = -1;
   }
-  pthread_cancel(pt);
+  pthread_cancel(tcom);
 
   progress_box->label("STOPPED");
   check_outdir->activate();
   but_outdir->activate();
   but_add->activate();
-  but_abort->hide();
+  but_extract->label("Extract");
+  but_extract->callback(extract_cb);
 
   Fl::remove_timeout(th);
   rotate_img->image(NULL);
@@ -606,11 +736,15 @@ static void browser_cb(Fl_Widget *)
 
 static void close_cb(Fl_Widget *, void *)
 {
-  pthread_cancel(pt);
+  pthread_cancel(tcom);
+  pthread_cancel(tinfo);
 
-  if (cmdWin && cmdWin->shown()) {
-    cmdWin->hide();
+  if (child_pid > getpid()) {
+    kill(child_pid, 1);
+    child_pid = -1;
   }
+
+  close_cmdWin_cb(NULL);
   win->hide();
 }
 
@@ -632,7 +766,7 @@ int main(int argc, char *argv[])
 {
   Fl_Box *dummy;
   Fl_Group *g, *g_top, *g_inside1, *g_inside2;
-  char *current_dir;
+  char *p;
 
   const int w = 800, h = 480, but_w = 110;
 
@@ -654,12 +788,12 @@ int main(int argc, char *argv[])
   max_h = Fl::h();
 
   /* set destination to current directory */
-  if ((current_dir = get_current_dir_name()) != NULL) {
-    outdir_manual = std::string(current_dir);
+  if ((p = get_current_dir_name()) != NULL) {
+    outdir_manual = std::string(p);
     if (outdir_manual[outdir_manual.size() - 1] != '/') {
       outdir_manual.push_back('/');
     }
-    free(current_dir);
+    free(p);
   } else {
     outdir_manual = "/tmp/";
   }
@@ -686,10 +820,6 @@ int main(int argc, char *argv[])
       but_extract = new Fl_Button(w - 10 - but_w, h - 10 - but_h, but_w, but_h, "Extract");
       but_extract->callback(extract_cb);
       but_extract->deactivate();
-
-      but_abort = new Fl_Button(but_extract->x(), but_extract->y(), but_w, but_h, "Abort");
-      but_abort->callback(abort_cb);
-      but_abort->hide();
 
       but_cmd = new Fl_Button(but_extract->x() - 10 - but_w, but_extract->y(), but_w, but_h, "Command");
       but_cmd->callback(cmd_cb);
@@ -754,24 +884,31 @@ int main(int argc, char *argv[])
   win->resizable(browser);
   win->position((max_w - win->w()) / 2, (max_h - win->h()) / 2); /* center */
   win->size_range(512, 384, max_w, max_h);
-  win->show();
 
   if (argc > 1) {
     if (fl_filename_isdir(argv[1])) {
       fl_message_title("Error");
       fl_message("`%s' is a directory!", argv[1]);
     } else if (access(argv[1], R_OK) == 0) {
-      file = std::string(argv[1]);
-      dnd_area->deactivate();
-      get_mkv_file_info();
-      dnd_area->activate();
+      if (argv[1][0] != '/' && (p = realpath(argv[1], NULL)) != NULL) {
+        file = std::string(p);
+        free(p);
+      } else {
+        file = std::string(argv[1]);
+      }
     } else {
       fl_message_title("Error");
       fl_message("cannot read file `%s'", argv[1]);
     }
   }
 
+  win->show();
+
   Fl::lock();
+
+  if (!file.empty()) {
+    pthread_create(&tinfo, NULL, &get_mkv_file_info, NULL);
+  }
 
   /* uncomment to test rotating animation */
   //Fl::add_timeout(img_duration, th);
