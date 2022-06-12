@@ -165,7 +165,7 @@ bool xml2ogm(const char *input, const char *output)
     }
 
     /* check time limits */
-    if (h<0||h>99 || m<0||m>59 || s<0||s>=60) {
+    if (h<0||h>99 || m<0||m>59 || s<0||s>59) {
       return false;
     }
 
