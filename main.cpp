@@ -92,6 +92,7 @@ static Fl_Check_Button *check_outdir;
 static Fl_Timeout_Handler th = reinterpret_cast<Fl_Timeout_Handler>(rotate_cb);
 
 static pthread_t tcom, tinfo;
+static bool tcom_init = false, tinfo_init = false;
 static pid_t child_pid = -1;
 static bool chapters = false, same_as_source = false, extract_chapters = false;
 static size_t count = 0, attach_count = 0;
@@ -338,7 +339,10 @@ static void dnd_callback(Fl_Widget *)
     fl_decode_uri(ch);
     file = ch + 7;
     free(ch);
-    pthread_create(&tinfo, NULL, &get_mkv_file_info, NULL);
+
+    if (pthread_create(&tinfo, NULL, &get_mkv_file_info, NULL) == 0) {
+      tinfo_init = true;
+    }
   }
 }
 
@@ -374,7 +378,10 @@ static void add_cb(Fl_Widget *, void *)
 
   if (gtk->show() == 0 && gtk->filename() != NULL) {
     file = std::string(gtk->filename());
-    pthread_create(&tinfo, NULL, &get_mkv_file_info, NULL);
+
+    if (pthread_create(&tinfo, NULL, &get_mkv_file_info, NULL) == 0) {
+      tinfo_init = true;
+    }
   }
 }
 
@@ -684,9 +691,13 @@ static void cmd_cb(Fl_Widget *)
   cmdWin->show();
 }
 
-static void extract_cb(Fl_Widget *) {
+static void extract_cb(Fl_Widget *)
+{
   close_cmdWin_cb(NULL);
-  pthread_create(&tcom, NULL, &run_extraction_command, NULL);
+
+  if (pthread_create(&tcom, NULL, &run_extraction_command, NULL) == 0) {
+    tcom_init = true;
+  }
 }
 
 static void abort_cb(Fl_Widget *)
@@ -736,8 +747,8 @@ static void browser_cb(Fl_Widget *)
 
 static void close_cb(Fl_Widget *, void *)
 {
-  pthread_cancel(tcom);
-  pthread_cancel(tinfo);
+  if (tcom_init) pthread_cancel(tcom);
+  if (tinfo_init) pthread_cancel(tinfo);
 
   if (child_pid > getpid()) {
     kill(child_pid, 1);
@@ -906,8 +917,8 @@ int main(int argc, char *argv[])
 
   Fl::lock();
 
-  if (!file.empty()) {
-    pthread_create(&tinfo, NULL, &get_mkv_file_info, NULL);
+  if (!file.empty() && pthread_create(&tinfo, NULL, &get_mkv_file_info, NULL) == 0) {
+    tinfo_init = true;
   }
 
   /* uncomment to test rotating animation */
