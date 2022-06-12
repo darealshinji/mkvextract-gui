@@ -441,7 +441,7 @@ extern "C" void *run_extraction_command(void *)
     }
     child_pid = -1;
 
-    const char *l = (pclose(fp) == 0) ? "DONE" : "ERROR";
+    const char *l = (fclose(fp) == 0) ? "DONE" : "ERROR";
 
     Fl::lock();
     progress_box->label(l);
