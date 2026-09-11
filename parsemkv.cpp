@@ -27,6 +27,7 @@
 #include <string>
 #include <vector>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -115,9 +116,55 @@ inline static bool checkLine(std::string &line, const std::string str)
   return false;
 }
 
-#define pop_push_back(v,s)  v.pop_back(); v.push_back(s)
+template<class T, typename U>
+void replace_last_entry(T &vec, U &str) {
+  vec.pop_back();
+  vec.push_back(str);
+}
 
-bool parsemkv(std::string file_quoted
+
+class temp_files
+{
+private:
+  std::string m_stats, m_link, m_error;
+
+public:
+
+  temp_files()
+  {}
+
+  ~temp_files() {
+    unlink(m_stats.c_str());
+    unlink(m_link.c_str());
+  }
+
+  bool create(const std::string &target)
+  {
+    m_error.clear();
+    unlink(m_stats.c_str());
+    unlink(m_link.c_str());
+
+    std::string pid = std::to_string(getpid());
+    m_stats = "/tmp/mkvextract-gui-" + pid + "-stats.txt";
+    m_link = "/tmp/mkvextract-gui-" + pid + "-link.mkv";
+
+    if (symlink(target.c_str(), m_link.c_str()) == 0) {
+      return true;
+    }
+
+    m_error = "cannot create link:\n";
+    m_error += m_link;
+
+    return false;
+  }
+
+  std::string stats() { return m_stats; }
+  std::string link()  { return m_link; }
+  std::string error() { return m_error; }
+};
+
+
+bool parsemkv(std::string &mkv_file
 ,             std::vector<std::string> &trackInfos
 ,             std::vector<std::string> &trackFilenames
 ,             std::vector<std::string> &attachmentInfos
@@ -130,46 +177,45 @@ bool parsemkv(std::string file_quoted
   std::vector<std::string> codecid, duration, name, language, width, height,
     freq, channels, filename, mime, fdata;
   std::string line, cmd;
+  temp_files temp;
 
-  char stats[] = "/tmp/mkvinfo-stats-XXXXXX";
-
-  if (mkstemp(stats) == -1) {
-    error = "cannot create temporary file:\n";
-    error.append(stats);
-    return false;
-  }
+  /* run mkvinfo */
 
   if (system("mkvinfo --version 2>/dev/null >/dev/null") != 0) {
     error = "mkvinfo doesn't seem to be in PATH!";
     return false;
   }
 
-  cmd = "mkvinfo --ui-language en_US --redirect-output ";
-  cmd += stats;
-  cmd += " " + file_quoted;
+  if (!temp.create(mkv_file)) {
+    error = temp.error();
+    return false;
+  }
+
+  cmd = "mkvinfo --no-bom --ui-language en_US ";
+  cmd += temp.link();
+  cmd += " 2>/dev/null > ";
+  cmd += temp.stats();
 
   if (system(cmd.c_str()) != 0) {
     error = "mkvinfo has returned an error";
     return false;
   }
 
-  ifs.open(stats, std::ifstream::in);
+  /* open stats file */
+  ifs.open(temp.stats(), std::ifstream::in);
 
   if (!ifs.is_open()) {
     error = "cannot open temporary file:\n";
-    error.append(stats);
+    error += temp.stats();
     return false;
   }
 
   /* start parsing the stats file */
-
   std::getline(ifs, line);
-  if (line != "\xEF\xBB\xBF" /* UTF8 byte order mark */ "+ EBML head" &&
-      line != "+ EBML head")
-  {
+
+  if (line != "+ EBML head") {
     error = "malformed stats file:\n";
-    error.append(stats);
-    ifs.close();
+    error += temp.stats();
     return false;
   }
 
@@ -218,19 +264,19 @@ bool parsemkv(std::string file_quoted
         continue;
       }
       else if (checkLine(line, S_codecid)) {
-        pop_push_back(codecid, line);
+        replace_last_entry(codecid, line);
         continue;
       }
       else if (checkLine(line, S_duration)) {
-        pop_push_back(duration, line);
+        replace_last_entry(duration, line);
         continue;
       }
       else if (checkLine(line, S_name)) {
-        pop_push_back(name, line);
+        replace_last_entry(name, line);
         continue;
       }
       else if (checkLine(line, S_language)) {
-        pop_push_back(language, line);
+        replace_last_entry(language, line);
         continue;
       }
       else if (line[0] == '|' && line[1] == '+') {
@@ -250,28 +296,28 @@ bool parsemkv(std::string file_quoted
       }
       else if (track_entry == tvideo) {
         if (checkLine(line, S_width)) {
-          pop_push_back(width, line);
+          replace_last_entry(width, line);
           continue;
         }
         else if (checkLine(line, S_height)) {
           line = "x" + line;
-          pop_push_back(height, line);
+          replace_last_entry(height, line);
           continue;
         }
       }
       else if (track_entry == taudio) {
         if (checkLine(line, S_channels)) {
           line += " channels";
-          pop_push_back(channels, line);
+          replace_last_entry(channels, line);
           continue;
         }
         else if (checkLine(line, S_freq)) {
           line = ", " + line + "Hz";
-          pop_push_back(freq, line);
+          replace_last_entry(freq, line);
           continue;
         }
         /* no entry means mono */
-        pop_push_back(channels, "1 channel");
+        replace_last_entry(channels, "1 channel");
       }
     } else if (line == "|+ Tracks") {
       tracks_begin = true;
@@ -288,16 +334,16 @@ bool parsemkv(std::string file_quoted
       continue;
     }
     else if (checkLine(line, S_filename)) {
-      pop_push_back(filename, line);
+      replace_last_entry(filename, line);
       continue;
     }
     else if (checkLine(line, S_mime)) {
-      pop_push_back(mime, line);
+      replace_last_entry(mime, line);
       continue;
     }
     else if (checkLine(line, S_fdata)) {
       line += " bytes";
-      pop_push_back(fdata, line);
+      replace_last_entry(fdata, line);
       continue;
     }
     else if (line == "|+ Chapters") {
@@ -307,7 +353,6 @@ bool parsemkv(std::string file_quoted
   }
 
   ifs.close();
-  unlink(stats);
 
   for (size_t i = 0; i < codecid.size(); i++) {
     std::stringstream ss1, ss2;
@@ -397,6 +442,4 @@ bool parsemkv(std::string file_quoted
 
   return true;
 }
-
-#undef pop_push_back
 

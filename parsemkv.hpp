@@ -28,7 +28,7 @@
 #include <string>
 #include <vector>
 
-bool parsemkv(std::string file_quoted
+bool parsemkv(std::string &mkv_file
 ,             std::vector<std::string> &trackInfos
 ,             std::vector<std::string> &trackFilenames
 ,             std::vector<std::string> &attachmentInfos

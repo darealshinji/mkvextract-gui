@@ -35,11 +35,30 @@ class dnd_box : public Fl_Box
 {
 public:
   dnd_box(int X, int Y, int W, int H, const char *L=0)
-    : Fl_Box(X, Y, W, H, L) { }
+    : Fl_Box(X, Y, W, H, L)
+  {}
 
-  virtual ~dnd_box() { }
+  ~dnd_box()
+  {}
 
-  int handle(int event);
+  int handle(int event)
+  {
+    int rv = Fl_Box::handle(event);
+
+    switch (event) {
+      case FL_DND_ENTER:
+      case FL_DND_DRAG:
+      case FL_DND_RELEASE:
+        rv = 1;
+        break;
+      case FL_PASTE:
+        do_callback();
+        rv = 1;
+        break;
+    }
+
+    return rv;
+  }
 };
 
 #endif  /* DND_HPP_INCLUDED */

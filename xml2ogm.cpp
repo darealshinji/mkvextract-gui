@@ -56,7 +56,6 @@ bool xml2ogm(const char *input, const char *output)
   std::string ogm;
   std::ofstream ofs;
   tinyxml2::XMLDocument xmlDoc;
-  tinyxml2::XMLElement *p, *pEE, *pCA;
   int val;
 
   if (!input || !output || strlen(input) < 1 || strlen(output) < 1) {
@@ -67,14 +66,14 @@ bool xml2ogm(const char *input, const char *output)
     return false;
   }
 
-  p = xmlDoc.FirstChildElement("Chapters");
+  auto p = xmlDoc.FirstChildElement("Chapters");
   if (!p) {
     return false;
   }
 
   /* EditionEntry */
 
-  pEE = p->FirstChildElement("EditionEntry");
+  auto pEE = p->FirstChildElement("EditionEntry");
 
   while (pEE) {
     val = 0;
@@ -92,7 +91,7 @@ bool xml2ogm(const char *input, const char *output)
 
   /* ChapterAtom */
 
-  pCA = pEE->FirstChildElement("ChapterAtom");
+  auto pCA = pEE->FirstChildElement("ChapterAtom");
   if (!pCA) {
     return false;
   }
@@ -102,7 +101,7 @@ bool xml2ogm(const char *input, const char *output)
   {
     int h, m;
     float s;
-    const char *label, *time, *fmt;
+    const char *label = NULL, *time = NULL, *fmt = NULL;
     char buf[64];
     tinyxml2::XMLElement *pCD;
 
