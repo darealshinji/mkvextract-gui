@@ -22,27 +22,46 @@
  * SOFTWARE.
  */
 
-#pragma once
-
-#include <string>
 #include <vector>
+#include <string>
 #include <stdio.h>
 #include <unistd.h>
 
 
-FILE *popen_vp(char **argv, pid_t &child_pid);
-FILE *popen_vp(std::vector<std::string> &argv, pid_t &child_pid);
+FILE *popen_vp(char **argv, pid_t &child_pid)
+{
+    enum { r = 0, w = 1 };
+    int fd[2];
 
-int mkvextract(const char *in);
+    if (pipe(fd) == -1) {
+        return NULL;
+    }
 
-bool parsemkv(std::string &mkv_file
-,             std::vector<std::string> &trackInfos
-,             std::vector<std::string> &trackFilenames
-,             std::vector<std::string> &attachmentInfos
-,             std::vector<std::string> &attachmentFilenames
-,             std::vector<int> &timestampIDs
-,             bool &has_chapters
-,             std::string &error);
+    if ((child_pid = fork()) != 0) {
+        close(fd[w]);
+        return fdopen(fd[r], "r");
+    }
 
-bool xml2ogm(const char *input, const char *output);
+    close(fd[r]);
+    dup2(fd[w], 1);
+    close(fd[w]);
 
+    execvp(argv[0], argv);
+
+    _exit(127);
+}
+
+
+FILE *popen_vp(std::vector<std::string> &argv, pid_t &child_pid)
+{
+    size_t len = argv.size();
+    char *child_argv[len + 1];
+
+    for (size_t i = 0; i < len; i++) {
+        child_argv[i] = const_cast<char *>(argv.at(i).c_str());
+    }
+
+    child_argv[len] = NULL;
+
+    return popen_vp(child_argv, child_pid);
+}

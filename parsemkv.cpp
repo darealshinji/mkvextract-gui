@@ -53,47 +53,6 @@ void replace_last_entry(T &vec, U &str) {
 }
 
 
-class temp_files
-{
-private:
-    std::string m_stats, m_link, m_error;
-
-public:
-
-    temp_files()
-    {}
-
-    ~temp_files() {
-        unlink(m_stats.c_str());
-        unlink(m_link.c_str());
-    }
-
-    bool create(const std::string &target)
-    {
-        m_error.clear();
-        unlink(m_stats.c_str());
-        unlink(m_link.c_str());
-
-        std::string pid = std::to_string(getpid());
-        m_stats = "/tmp/mkvextract-gui-" + pid + "-stats.txt";
-        m_link = "/tmp/mkvextract-gui-" + pid + "-link.mkv";
-
-        if (symlink(target.c_str(), m_link.c_str()) == 0) {
-            return true;
-        }
-
-        m_error = "cannot create link:\n";
-        m_error += m_link;
-
-        return false;
-    }
-
-    std::string stats() { return m_stats; }
-    std::string link()  { return m_link; }
-    std::string error() { return m_error; }
-};
-
-
 bool parsemkv(std::string &mkv_file
 ,             std::vector<std::string> &trackInfos
 ,             std::vector<std::string> &trackFilenames
@@ -106,8 +65,11 @@ bool parsemkv(std::string &mkv_file
     std::ifstream ifs;
     std::vector<std::string> codecid, duration, name, language, width, height,
         freq, channels, filename, mime, fdata;
-    std::string line, cmd;
-    temp_files temp;
+    std::string line;
+    char *buf = NULL;
+    pid_t pid;
+    FILE *fp;
+    size_t n = 0;
 
     /* run mkvinfo */
 
@@ -116,36 +78,23 @@ bool parsemkv(std::string &mkv_file
         return false;
     }
 
-    if (!temp.create(mkv_file)) {
-        error = temp.error();
-        return false;
-    }
+    char *args[] = {
+        const_cast<char *>("mkvinfo"),
+        const_cast<char *>("--no-bom"),
+        const_cast<char *>("--ui-language"),
+        const_cast<char *>("en_US"),
+        const_cast<char *>(mkv_file.c_str()),
+        NULL
+    };
 
-    cmd = "mkvinfo --no-bom --ui-language en_US ";
-    cmd += temp.link();
-    cmd += " 2>/dev/null > ";
-    cmd += temp.stats();
-
-    if (system(cmd.c_str()) != 0) {
+    if ((fp = popen_vp(args, pid)) == NULL) {
         error = "mkvinfo has returned an error";
         return false;
     }
 
-    /* open stats file */
-    ifs.open(temp.stats(), std::ifstream::in);
-
-    if (!ifs.is_open()) {
-        error = "cannot open temporary file:\n";
-        error += temp.stats();
-        return false;
-    }
-
-    /* start parsing the stats file */
-    std::getline(ifs, line);
-
-    if (line != "+ EBML head") {
-        error = "malformed stats file:\n";
-        error += temp.stats();
+    if (getline(&buf, &n, fp) == -1 || !buf || strcmp(buf, "+ EBML head\n") != 0) {
+        error = "malformed mkvinfo output";
+        fclose(fp);
         return false;
     }
 
@@ -179,7 +128,13 @@ bool parsemkv(std::string &mkv_file
     timestampIDs.clear();
 
     /* parse tracks */
-    while (std::getline(ifs, line)) {
+    while (getline(&buf, &n, fp) != -1) {
+        line = buf;
+
+        if (line.ends_with('\n')) {
+            line.pop_back();
+        }
+
         if (tracks_begin) {
             if (line == "| + Track") {
                 codecid.push_back("");
@@ -209,7 +164,7 @@ bool parsemkv(std::string &mkv_file
                 replace_last_entry(language, line);
                 continue;
             }
-            else if (line[0] == '|' && line[1] == '+') {
+            else if (line.starts_with("|+")) {
                 /* end of track entries */
                 break;
             }
@@ -246,6 +201,7 @@ bool parsemkv(std::string &mkv_file
                     replace_last_entry(freq, line);
                     continue;
                 }
+
                 /* no entry means mono */
                 replace_last_entry(channels, "1 channel");
             }
@@ -256,7 +212,13 @@ bool parsemkv(std::string &mkv_file
     }
 
     /* parse attachments and chapters */
-    while (std::getline(ifs, line)) {
+    while (getline(&buf, &n, fp) != -1) {
+        line = buf;
+
+        if (line.ends_with('\n')) {
+            line.pop_back();
+        }
+
         if (line == "| + Attached") {
             filename.push_back("");
             mime.push_back("");
@@ -282,7 +244,7 @@ bool parsemkv(std::string &mkv_file
         }
     }
 
-    ifs.close();
+    fclose(fp);
 
     for (size_t i = 0; i < codecid.size(); i++) {
         std::stringstream ss1, ss2;

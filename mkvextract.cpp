@@ -119,38 +119,6 @@ static inline void unlock() {
     Fl::awake();
 }
 
-static FILE *popen_mkvextract()
-{
-    enum { r = 0, w = 1 };
-    int fd[2];
-
-    if (pipe(fd) == -1) {
-        return NULL;
-    }
-
-    if ((child_pid = fork()) != 0) {
-        close(fd[w]);
-        return fdopen(fd[r], "r");
-    }
-
-    size_t len = args.size();
-    auto child_argv = new char *[len + 1];
-
-    for (size_t i = 0; i < len; i++) {
-        child_argv[i] = const_cast<char *>(args.at(i).c_str());
-    }
-    child_argv[len] = NULL;
-
-    close(fd[r]);
-    dup2(fd[w], 1);
-    close(fd[w]);
-    execvp("mkvextract", child_argv);
-
-    delete[] child_argv;
-    _exit(127);
-}
-
-
 template<typename T>
 bool find_str(const std::string &haystack, const T &needle, size_t &pos)
 {
@@ -444,7 +412,7 @@ extern "C" void *run_extraction_command(void *)
 
     unlock();
 
-    if ((fp = popen_mkvextract()) == NULL) {
+    if ((fp = popen_vp(args, child_pid)) == NULL) {
         lock();
         progress_box->label("ERROR");
         extract_chapters = false;

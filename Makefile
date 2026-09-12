@@ -8,7 +8,7 @@ LIBS  = $(shell $(FLTK_CONFIG) --ldstaticflags --libs --use-images)
 LIBS += $(shell $(PKG_CONFIG) --libs fontconfig)
 
 BIN  = simple-mkvextract-gui
-OBJS = main.o mkvextract.o parsemkv.o xml2ogm.o
+OBJS = main.o mkvextract.o parsemkv.o popen_vp.o xml2ogm.o
 
 TINYXML2_LIBS = $(shell $(PKG_CONFIG) --libs tinyxml2 2>/dev/null)
 
