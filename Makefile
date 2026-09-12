@@ -28,8 +28,9 @@ clean:
 $(BIN): $(OBJS)
 	$(CXX) -o $@ $^ $(LDFLAGS) $(LIBS)
 
-mkvextract.cpp: dnd.hpp check_browser.hpp parsemkv.hpp xml2ogm.hpp
-parsemkv.cpp: parsemkv.hpp codecs.h
-tinyxml2.cpp: tinyxml2.h
-xml2ogm.cpp: xml2ogm.hpp
+main.cpp: mkvextract.hpp
+mkvextract.cpp: mkvextract.hpp dnd.hpp check_browser.hpp
+parsemkv.cpp: mkvextract.hpp codecs.h
+tinyxml2/tinyxml2.cpp: tinyxml2/tinyxml2.h
+xml2ogm.cpp: mkvextract.hpp
 

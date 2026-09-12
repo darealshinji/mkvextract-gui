@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2019, djcj <djcj@gmx.de>
+ * Copyright (c) 2026 djcj <djcj@gmx.de>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,9 +22,21 @@
  * SOFTWARE.
  */
 
-#ifndef XML2OGM_HPP_INCLUDED
-#define XML2OGM_HPP_INCLUDED
+#pragma once
+
+#include <string>
+#include <vector>
+
+int mkvextract(const char *in);
+
+bool parsemkv(std::string &mkv_file
+,             std::vector<std::string> &trackInfos
+,             std::vector<std::string> &trackFilenames
+,             std::vector<std::string> &attachmentInfos
+,             std::vector<std::string> &attachmentFilenames
+,             std::vector<int> &timestampIDs
+,             bool &has_chapters
+,             std::string &error);
 
 bool xml2ogm(const char *input, const char *output);
 
-#endif  /* XML2OGM_HPP_INCLUDED */
