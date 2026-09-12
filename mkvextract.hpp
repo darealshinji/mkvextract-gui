@@ -30,10 +30,12 @@
 #include <unistd.h>
 
 
+namespace mkvextract {
+    int start(const char *in);
+}
+
 FILE *popen_vp(char **argv, pid_t &child_pid);
 FILE *popen_vp(std::vector<std::string> &argv, pid_t &child_pid);
-
-int mkvextract(const char *in);
 
 bool parsemkv(std::string &mkv_file
 ,             std::vector<std::string> &trackInfos

@@ -57,53 +57,90 @@
 namespace fs = std::filesystem;
 
 
-static const char svg_rotation_template[] =
-    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-    "<svg width=\"1024\" height=\"1024\" version=\"1.1\" viewBox=\"0 0 270.93 270.93\""
-    " xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\">"
-        "<g transform=\"matrix(.82922 0 0 .82922 23.133 1.5165)\" stroke-width=\"0\">"
-            "<rect transform=\"rotate(0)\"   x=\"0\"       y=\"152.81\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-            "<rect transform=\"rotate(45)\"  x=\"74.544\"  y=\"9.7088\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-            "<rect transform=\"rotate(90)\"  x=\"26.067\"  y=\"-144.19\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-            "<rect transform=\"rotate(135)\" x=\"-117.03\" y=\"-218.73\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-            "<rect transform=\"rotate(0)\"   x=\"181.1\"   y=\"152.81\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-            "<rect transform=\"rotate(45)\"  x=\"255.64\"  y=\"9.7088\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-            "<rect transform=\"rotate(90)\"  x=\"207.17\"  y=\"-144.19\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-            "<rect transform=\"rotate(135)\" x=\"64.064\"  y=\"-218.73\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-        "</g>"
-    "</svg>";
+namespace mkvextract
+{
+    static void init(int but_h);
+    static void cleanup();
+    int start(const char *in);
+}
 
 
-static const float img_duration = 0.1;  /* seconds */
-static const int last_frame = 7;
-static int current_frame = 0;
+namespace callback
+{
+    static void abort(Fl_Widget *);
+    static void add(Fl_Widget *, void *);
+    static void browse_outdir(Fl_Widget *);
+    static void check_outdir(Fl_Widget *);
+    static void clipboard(Fl_Widget *, void *);
+    static void close_cmdWin(Fl_Widget *);
+    static void close(Fl_Widget *, void *);
+    static void cmd(Fl_Widget *, void *);
+    static void dnd(Fl_Widget *);
+    static void extract(Fl_Widget *);
+    static void null(Fl_Widget *, void *);
+    static void rotate_timeout(void *);
+    static void rotate(Fl_Widget *);
+    static void select_all(Fl_Widget *, void *);
+    static void select_none(Fl_Widget *, void *);
+    static void update_browser(Fl_Widget *);
+}
 
-static std::vector<Fl_SVG_Image *> img_rotate;
+
+namespace thread
+{
+    static pthread_t extract, info;
+    static bool extract_init = false;
+    static bool info_init = false;
+    static pid_t pid = -1;
+
+    static void start_mkvinfo();
+    static void stop();
+}
+
+
+namespace rotate
+{
+    static const char svg_template[] =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+        "<svg width=\"1024\" height=\"1024\" version=\"1.1\" viewBox=\"0 0 270.93 270.93\""
+        " xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\">"
+            "<g transform=\"matrix(.82922 0 0 .82922 23.133 1.5165)\" stroke-width=\"0\">"
+                "<rect transform=\"rotate(0)\"   x=\"0\"       y=\"152.81\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
+                "<rect transform=\"rotate(45)\"  x=\"74.544\"  y=\"9.7088\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
+                "<rect transform=\"rotate(90)\"  x=\"26.067\"  y=\"-144.19\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
+                "<rect transform=\"rotate(135)\" x=\"-117.03\" y=\"-218.73\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
+                "<rect transform=\"rotate(0)\"   x=\"181.1\"   y=\"152.81\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
+                "<rect transform=\"rotate(45)\"  x=\"255.64\"  y=\"9.7088\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
+                "<rect transform=\"rotate(90)\"  x=\"207.17\"  y=\"-144.19\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
+                "<rect transform=\"rotate(135)\" x=\"64.064\"  y=\"-218.73\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
+            "</g>"
+        "</svg>";
+
+    static std::vector<Fl_SVG_Image *> array;
+    static std::vector<Fl_SVG_Image *>::iterator frame;
+    static Fl_Box *box = NULL;
+
+    static Fl_Timeout_Handler handle = callback::rotate_timeout;
+    static const float speed = 0.1; /* seconds */
+}
+
+
+extern "C" void *get_mkv_file_info(void *);
+static std::string create_extraction_command(bool extract);
 
 static Fl_Double_Window *win = NULL;
-static const int but_h = 28;
-
 static Fl_Double_Window *cmdWin = NULL;
-static Fl_Text_Buffer *cmdBuff;
 
-static Fl_Native_File_Chooser *fc = NULL;
-static check_browser *browser;
-static dnd_box *dnd_area;
+static check_browser *browser = NULL;
+static dnd_box *dnd_area = NULL;
 static Fl_Button *but_outdir, *but_add, *but_extract, *but_cmd;
-static Fl_Box *progress_box, *outdir_field, *infile_label, *rotate_img;
+static Fl_Box *progress_box, *outdir_field, *infile_label;
 static Fl_Check_Button *check_outdir;
-
-static Fl_Timeout_Handler th;
-
-static pthread_t tcom, tinfo;
-static bool tcom_init = false;
-static bool tinfo_init = false;
-static pid_t child_pid = -1;
 
 static bool chapters = false, same_as_source = false, extract_chapters = false;
 static size_t count = 0, attach_count = 0;
 
-static std::string file, outdir_auto, outdir_manual;
+static std::string file, outdir_source, outdir_manual;
 static std::vector<int> timestampIDs;
 static std::vector<std::string> outnames;
 static std::vector<std::string> args;
@@ -120,16 +157,14 @@ static inline void unlock() {
 }
 
 template<typename T>
-bool find_str(const std::string &haystack, const T &needle, size_t &pos)
-{
+bool find_str(const std::string &haystack, const T &needle, size_t &pos) {
     return ((pos = haystack.find(needle)) != std::string::npos);
 }
 
-template<typename T>
-bool find_str(const std::string &haystack, const T &needle)
-{
-    return (haystack.find(needle) != std::string::npos);
-}
+//template<typename T>
+//bool find_str(const std::string &haystack, const T &needle) {
+//    return (haystack.find(needle) != std::string::npos);
+//}
 
 static std::string quote_filename(const std::string in)
 {
@@ -178,13 +213,10 @@ static bool file_is_matroska(std::string &file)
     return (memcmp(bytes, "\x1A\x45\xDF\xA3", 4) == 0);
 }
 
-
-extern "C" void *get_mkv_file_info(void *);
-
-static void mkv_file_info_create_thread()
+static void thread::start_mkvinfo()
 {
-    if (!file.empty() && pthread_create(&tinfo, NULL, &get_mkv_file_info, NULL) == 0) {
-        tinfo_init = true;
+    if (pthread_create(&thread::info, NULL, &get_mkv_file_info, NULL) == 0) {
+        thread::info_init = true;
     }
 }
 
@@ -192,7 +224,6 @@ extern "C" void *get_mkv_file_info(void *)
 {
     std::vector<std::string> tracks, attachments, names1, names2;
     std::string error;
-    std::size_t pos;
 
     lock();
     dnd_area->deactivate();
@@ -236,13 +267,11 @@ extern "C" void *get_mkv_file_info(void *)
         return NULL;
     }
 
-    /* get dirname */
-    outdir_auto = file;
+    /* save input file's dirname */
+    outdir_source = fs::path(file).parent_path().string();
 
-    if (find_str(outdir_auto, '/', pos)) {
-        outdir_auto = "";
-    } else {
-        outdir_auto.erase(pos + 1);
+    if (!outdir_source.ends_with('/')) {
+        outdir_source += '/';
     }
 
     outnames.clear();
@@ -276,10 +305,11 @@ extern "C" void *get_mkv_file_info(void *)
     browser->add("Tags");
 
     infile_label->copy_label(file.c_str());
+
     check_outdir->activate();
     dnd_area->activate();
     but_add->activate();
-    win->redraw();
+    Fl::redraw();
 
     unlock();
 
@@ -291,26 +321,41 @@ extern "C" void *get_mkv_file_info(void *)
     return NULL;
 }
 
-static void rotate_callback(Fl_Widget *)
+
+static void restore_main_window()
 {
-    if (current_frame < last_frame) {
-        current_frame++;
-    } else {
-        current_frame = 0;
+    dnd_area->activate();
+    check_outdir->activate();
+    but_outdir->activate();
+    but_add->activate();
+
+    but_extract->label("Extract");
+    but_extract->callback(callback::extract);
+
+    Fl::remove_timeout(rotate::handle);
+    rotate::box->image(NULL);
+
+    Fl::redraw();
+}
+
+static void callback::rotate(Fl_Widget *)
+{
+    if (++rotate::frame == rotate::array.end()) {
+        rotate::frame = rotate::array.begin();
     }
 
-    rotate_img->image(img_rotate[current_frame]);
-    rotate_img->parent()->redraw();
+    rotate::box->image(*rotate::frame);
+    rotate::box->parent()->redraw();
 
-    Fl::repeat_timeout(img_duration, th);
+    Fl::repeat_timeout(rotate::speed, rotate::handle);
 }
 
-static void rotate_th_callback(void *)
+static void callback::rotate_timeout(void *)
 {
-    rotate_callback(NULL);
+    callback::rotate(NULL);
 }
 
-static void dnd_callback(Fl_Widget *)
+static void callback::dnd(Fl_Widget *)
 {
     std::string items(Fl::event_text());
     std::size_t pos;
@@ -324,55 +369,51 @@ static void dnd_callback(Fl_Widget *)
             fl_decode_uri(copy);
             file = copy + 7;
             free(copy);
-            mkv_file_info_create_thread();
+            thread::start_mkvinfo();
         } else if (items.starts_with('/')) {
             file = items;
-            mkv_file_info_create_thread();
+            thread::start_mkvinfo();
         }
     }
 }
 
-static void browse_outdir_cb(Fl_Widget *)
+static void callback::browse_outdir(Fl_Widget *)
 {
-    if (fc) delete fc;
+    const char *ptr;
 
-    fc = new Fl_Native_File_Chooser(Fl_Native_File_Chooser::BROWSE_DIRECTORY);
-    fc->title("Select output directory");
+    auto o = new Fl_Native_File_Chooser(Fl_Native_File_Chooser::BROWSE_DIRECTORY);
+    o->title("Select output directory");
 
-    if (fc->show() != 0) {
-        return;
+    if (o->show() == 0 && (ptr = o->filename()) != NULL && *ptr != 0) {
+        outdir_manual = ptr;
+
+        if (!outdir_manual.ends_with('/')) {
+            outdir_manual += '/';
+        }
+
+        if (!same_as_source) {
+            outdir_field->copy_label(outdir_manual.c_str());
+        }
     }
 
-    const char *dir = fc->filename();
-
-    if (!dir) {
-        return;
-    }
-
-    outdir_manual = std::string(dir) + "/";
-
-    if (!same_as_source) {
-        outdir_field->copy_label(outdir_manual.c_str());
-    }
+    delete o;
 }
 
-static void add_callback(Fl_Widget *, void *)
+static void callback::add(Fl_Widget *, void *)
 {
-    if (fc) delete fc;
+    const char *ptr;
 
-    fc = new Fl_Native_File_Chooser(Fl_Native_File_Chooser::BROWSE_FILE);
-    fc->title("Select a file");
-    fc->filter("*.mkv|*.mk3d|*.mka|*.mks|*.webm");
+    auto o = new Fl_Native_File_Chooser(Fl_Native_File_Chooser::BROWSE_FILE);
+    o->title("Select a file");
+    o->filter("*.mkv|*.mk3d|*.mka|*.mks|*.webm");
 
-    if (fc->show() == 0 && fc->filename() != NULL) {
-        file = std::string(fc->filename());
-        mkv_file_info_create_thread();
+    if (o->show() == 0 && (ptr = o->filename()) != NULL && *ptr != 0) {
+        file = ptr;
+        thread::start_mkvinfo();
     }
-}
 
-static std::string create_extraction_command(bool extract);
-static void abort_cb(Fl_Widget *);
-static void extract_cb(Fl_Widget *);
+    delete o;
+}
 
 extern "C" void *run_extraction_command(void *)
 {
@@ -384,9 +425,9 @@ extern "C" void *run_extraction_command(void *)
     const char keyword[] = "#GUI#progress ";
     const size_t keyword_len = sizeof(keyword)-1;
 
-    if (child_pid > getpid()) {
-        kill(child_pid, 1);
-        child_pid = -1;
+    if (thread::pid > getpid()) {
+        kill(thread::pid, 1);
+        thread::pid = -1;
     }
 
     if (system("mkvextract --version 2>/dev/null >/dev/null") != 0) {
@@ -407,12 +448,12 @@ extern "C" void *run_extraction_command(void *)
     but_add->deactivate();
 
     but_extract->label("Abort");
-    but_extract->callback(abort_cb);
-    Fl::add_timeout(img_duration, th);
+    but_extract->callback(callback::abort);
+    Fl::add_timeout(rotate::speed, rotate::handle);
 
     unlock();
 
-    if ((fp = popen_vp(args, child_pid)) == NULL) {
+    if ((fp = popen_vp(args, thread::pid)) == NULL) {
         lock();
         progress_box->label("ERROR");
         extract_chapters = false;
@@ -428,7 +469,7 @@ extern "C" void *run_extraction_command(void *)
         }
 
         free(line);
-        child_pid = -1;
+        thread::pid = -1;
 
         const char *l = (fclose(fp) == 0) ? "DONE" : "ERROR";
 
@@ -438,22 +479,12 @@ extern "C" void *run_extraction_command(void *)
     }
 
     lock();
-
-    dnd_area->activate();
-    check_outdir->activate();
-    but_outdir->activate();
-    but_add->activate();
-    but_extract->label("Extract");
-    but_extract->callback(extract_cb);
-
-    Fl::remove_timeout(th);
-    rotate_img->image(NULL);
-
+    restore_main_window();
     unlock();
 
     if (chapters && extract_chapters) {
         if (same_as_source) {
-            base = outdir_auto + fs::path(file).stem().string();
+            base = outdir_source + fs::path(file).stem().string();
         } else {
             base = outdir_manual + fs::path(file).stem().string();
         }
@@ -492,7 +523,7 @@ static std::string create_extraction_command(bool extract)
     }
 
     if (same_as_source) {
-        base = outdir_auto + fs::path(file).stem().string();
+        base = outdir_source + fs::path(file).stem().string();
     } else {
         base = outdir_manual + fs::path(file).stem().string();
     }
@@ -611,85 +642,81 @@ static std::string create_extraction_command(bool extract)
     return command;
 }
 
-static void clipboard_cb(Fl_Widget *)
+static void callback::clipboard(Fl_Widget *, void *p)
 {
-    char *text = cmdBuff->text();
-    Fl::copy(text, cmdBuff->length(), 1);
+    auto o = reinterpret_cast<Fl_Text_Buffer *>(p);
+    char *text = o->text();
+    Fl::copy(text, o->length(), 1);
     free(text);
 }
 
-static void close_cmdWin_cb(Fl_Widget *)
+static void callback::close_cmdWin(Fl_Widget *)
 {
-    if (cmdWin && cmdWin->shown()) {
+    if (cmdWin) {
         cmdWin->hide();
     }
 }
 
-static void cmd_callback(Fl_Widget *)
+static void callback::cmd(Fl_Widget *, void *p)
 {
+    auto o = reinterpret_cast<Fl_Text_Buffer *>(p);
     std::string command = create_extraction_command(false);
-    cmdBuff->text(command.c_str());
+    o->text(command.c_str());
     cmdWin->show();
 }
 
-static void extract_cb(Fl_Widget *)
+static void callback::extract(Fl_Widget *)
 {
-    close_cmdWin_cb(NULL);
+    if (cmdWin) {
+        cmdWin->hide();
+    }
 
-    if (pthread_create(&tcom, NULL, &run_extraction_command, NULL) == 0) {
-        tcom_init = true;
+    if (pthread_create(&thread::extract, NULL, &run_extraction_command, NULL) == 0) {
+        thread::extract_init = true;
     }
 }
 
-static void stop_threads()
+static void thread::stop()
 {
-    if (tcom_init) {
-        pthread_cancel(tcom);
-        tcom_init = false;
+    if (thread::extract_init) {
+        pthread_cancel(thread::extract);
+        thread::extract_init = false;
     }
 
-    if (tinfo_init) {
-        pthread_cancel(tinfo);
-        tinfo_init = false;
+    if (thread::info_init) {
+        pthread_cancel(thread::info);
+        thread::info_init = false;
     }
 
-    if (child_pid > getpid()) {
-        kill(child_pid, 1);
-        child_pid = -1;
+    if (thread::pid > getpid()) {
+        kill(thread::pid, 1);
+        thread::pid = -1;
     }
 }
 
-static void abort_cb(Fl_Widget *)
+static void callback::abort(Fl_Widget *)
 {
-    stop_threads();
-
+    thread::stop();
     progress_box->label("STOPPED");
-    check_outdir->activate();
-    but_outdir->activate();
-    but_add->activate();
-    but_extract->label("Extract");
-    but_extract->callback(extract_cb);
-
-    Fl::remove_timeout(th);
-    rotate_img->image(NULL);
+    restore_main_window();
 }
 
 
-static void check_outdir_cb(Fl_Widget *)
+static void callback::check_outdir(Fl_Widget *)
 {
     if (same_as_source) {
         outdir_field->copy_label(outdir_manual.c_str());
         outdir_field->activate();
         same_as_source = false;
     } else {
-        outdir_field->copy_label(outdir_auto.c_str());
+        outdir_field->copy_label(outdir_source.c_str());
         outdir_field->deactivate();
         same_as_source = true;
     }
 }
 
 
-static void browser_cb(Fl_Widget *)
+static void callback::update_browser(Fl_Widget *)
 {
     if (browser->nchecked() > 0) {
         but_extract->activate();
@@ -702,18 +729,35 @@ static void browser_cb(Fl_Widget *)
     }
 }
 
-static void close_cb(Fl_Widget *, void *)
+static void callback::close(Fl_Widget *, void *)
 {
-    stop_threads();
-    close_cmdWin_cb(NULL);
+    thread::stop();
+
+    if (cmdWin) {
+        cmdWin->hide();
+    }
+
     win->hide();
 }
 
-static void mkvextract_init()
+static void callback::select_all(Fl_Widget *, void *)
 {
-    /* timeout handler */
-    th = rotate_th_callback;
+    browser->check_all();
+    callback::update_browser(NULL);
+}
 
+static void callback::select_none(Fl_Widget *, void *)
+{
+    browser->check_none();
+    callback::update_browser(NULL);
+}
+
+static void callback::null(Fl_Widget *, void *)
+{
+}
+
+static void mkvextract::init(int but_h)
+{
     /* set destination to current directory */
     char *p = get_current_dir_name();
 
@@ -733,152 +777,213 @@ static void mkvextract_init()
     FcInit();
 
     /* create rotation symbols */
-    char buf[sizeof(svg_rotation_template) + 16];
-
     std::vector<const char *> v = { /* color values */
-        "555", "999", "ddd", "000", "000", "000", "000", "000"
+        "555", "999", "ddd", "000",  "000", "000", "000", "000"
     };
+
+    size_t size = sizeof(rotate::svg_template) + 3*8;
+    auto buf = new char[size];
 
     for (size_t i = 0; i < v.size(); i++) {
         if (i > 0) {
-            /* rotate color entries */
+            /* rotate/shift color entries */
             v.insert(v.begin(), v.back());
             v.pop_back();
         }
 
-        snprintf(buf, sizeof(buf), svg_rotation_template,
+        snprintf(buf, size, rotate::svg_template,
             v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]);
-
-        img_rotate.push_back(new Fl_SVG_Image(NULL, buf));
-        img_rotate.back()->resize(but_h, but_h);
+        rotate::array.push_back(new Fl_SVG_Image(NULL, buf));
+        rotate::array.back()->resize(but_h, but_h);
     }
+
+    rotate::frame = rotate::array.begin();
+
+    delete[] buf;
 }
 
-static void mkvextract_cleanup()
+static void mkvextract::cleanup()
 {
-    stop_threads();
+    thread::stop();
 
     if (win) delete win;
-    if (fc) delete fc;
     if (cmdWin) delete cmdWin;
 
-    while (!img_rotate.empty()) {
-        delete img_rotate.back();
-        img_rotate.pop_back();
+    while (!rotate::array.empty()) {
+        delete rotate::array.back();
+        rotate::array.pop_back();
     }
 }
 
 
-static void select_all_cb(Fl_Widget *, void *)
+int mkvextract::start(const char *in)
 {
-    browser->check_all();
-    browser_cb(NULL);
-}
-
-static void select_none_cb(Fl_Widget *, void *)
-{
-    browser->check_none();
-    browser_cb(NULL);
-}
-
-static void dismiss_cb(Fl_Widget *, void *)
-{
-}
-
-
-int mkvextract(const char *in)
-{
-    const int w = 800, h = 480;
+    const int w = 800;
+    const int h = 480;
+    const int but_h = 28;
     const int but_w = 110;
 
     static Fl_Menu_Item context_menu[] = {
-        { " Select all",      0, select_all_cb                         },
-        { " Select none",     0, select_none_cb, NULL, FL_MENU_DIVIDER },
-        { " Open file",       0, add_callback                          },
-        { " Close program  ", 0, close_cb,       NULL, FL_MENU_DIVIDER },
-        { " Dismiss",         0, dismiss_cb                            },
+        { " Select all",     0, callback::select_all                         },
+        { " Select none",    0, callback::select_none, NULL, FL_MENU_DIVIDER },
+        { " Open file",      0, callback::add                                },
+        { " Close program ", 0, callback::close,       NULL, FL_MENU_DIVIDER },
+        { " Dismiss",        0, callback::null                               },
         { 0 }
     };
 
     /* init data */
-    mkvextract_init();
+    mkvextract::init(but_h);
 
     /* main window */
+
+    auto position_at_center = [] (Fl_Double_Window *o) {
+        o->position((Fl::w() - o->w()) / 2,
+                    (Fl::h() - o->h()) / 2);
+    };
+
     Fl_Box *dummy;
     Fl_Group *g, *g_top, *g_inside1, *g_inside2;
+    const int align_center = FL_ALIGN_CENTER | FL_ALIGN_INSIDE | FL_ALIGN_CLIP;
+    const int align_left = FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_CLIP;
+
+    auto buffer = new Fl_Text_Buffer();
 
     win = new Fl_Double_Window(w, h, "simple mkvextract GUI");
-    win->callback(close_cb);
+    win->callback(callback::close);
     {
-        g = new Fl_Group(0, h - but_h*2 - 25, w, but_h*2 + 25);
+        g = new Fl_Group(0,
+                         h - but_h*2 - 25,
+                         w,
+                         but_h*2 + 25);
         {
-            but_extract = new Fl_Button(w - 10 - but_w, h - 10 - but_h, but_w, but_h, "Extract");
-            but_extract->callback(extract_cb);
-            but_extract->deactivate();
+            { auto o = but_extract = new Fl_Button(w - 10 - but_w,
+                                                   h - 10 - but_h,
+                                                   but_w,
+                                                   but_h,
+                                                   "Extract");
+              o->callback(callback::extract);
+              o->deactivate();
+            } /* but_extract */
 
-            but_cmd = new Fl_Button(but_extract->x() - 10 - but_w, but_extract->y(), but_w, but_h, "Command");
-            but_cmd->callback(cmd_callback);
-            but_cmd->deactivate();
+            { auto o = but_cmd = new Fl_Button(but_extract->x() - 10 - but_w,
+                                               but_extract->y(),
+                                               but_w,
+                                               but_h,
+                                               "Command");
+              o->callback(callback::cmd, buffer);
+              o->deactivate();
+            } /* but_cmd */
 
-            g_inside1 = new Fl_Group(0, but_extract->y(), w - 30 - 2*but_w, but_h);
+            g_inside1 = new Fl_Group(0,
+                                     but_extract->y(),
+                                     w - 30 - 2*but_w,
+                                     but_h);
             {
-                progress_box = new Fl_Box(10, but_extract->y(), but_w, but_h);
-                progress_box->align(FL_ALIGN_CENTER|FL_ALIGN_INSIDE|FL_ALIGN_CLIP);
-                progress_box->box(FL_THIN_DOWN_BOX);
+                { auto o = progress_box = new Fl_Box(10,
+                                                     but_extract->y(),
+                                                     but_w,
+                                                     but_h);
+                  o->align(align_center);
+                  o->box(FL_THIN_DOWN_BOX);
+                } /* progress_box */
 
-                rotate_img = new Fl_Box(but_w + 15, progress_box->y(), but_h, but_h);
+                rotate::box = new Fl_Box(but_w + 15,
+                                         progress_box->y(),
+                                         but_h,
+                                         but_h);
 
-                dummy = new Fl_Box(but_cmd->x() - 1, progress_box->y(), 1, 1);
-                dummy->box(FL_NO_BOX);
+                { auto o = dummy = new Fl_Box(but_cmd->x() - 1,
+                                              progress_box->y(),
+                                              1,
+                                              1);
+                  o->box(FL_NO_BOX);
+                } /* dummy */
             }
             g_inside1->resizable(dummy);
             g_inside1->end();
 
-            g_inside2 = new Fl_Group(0, g->y(), g_inside1->w(), but_h);
+            g_inside2 = new Fl_Group(0,
+                                     g->y(),
+                                     g_inside1->w(),
+                                     but_h);
             {
-                outdir_field = new Fl_Box(10, but_extract->y() - but_h - 5, g_inside2->w() - 10, but_h, outdir_manual.c_str());
-                outdir_field->align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE|FL_ALIGN_CLIP);
-                outdir_field->box(FL_THIN_DOWN_BOX);
+                { auto o = outdir_field = new Fl_Box(10,
+                                                     but_extract->y() - but_h - 5,
+                                                     g_inside2->w() - 10,
+                                                     but_h,
+                                                     outdir_manual.c_str());
+                  o->align(align_left);
+                  o->box(FL_THIN_DOWN_BOX);
+                } /* outdir_field */
             }
             g_inside2->resizable(outdir_field);
             g_inside2->end();
 
-            check_outdir = new Fl_Check_Button(but_extract->x(), but_extract->y() - but_h - 5, but_w, but_h, " Use Source");
-            check_outdir->deactivate();
-            check_outdir->callback(check_outdir_cb);
-            check_outdir->clear_visible_focus();
+            { auto o = check_outdir = new Fl_Check_Button(but_extract->x(),
+                                                          but_extract->y() - but_h - 5,
+                                                          but_w,
+                                                          but_h,
+                                                          " Use Source");
+              o->deactivate();
+              o->callback(callback::check_outdir);
+              o->clear_visible_focus();
+            } /* check_outdir */
 
-            but_outdir = new Fl_Button(but_cmd->x(), check_outdir->y(), but_w, but_h, "Destination");
-            but_outdir->callback(browse_outdir_cb);
+            { auto o = but_outdir = new Fl_Button(but_cmd->x(),
+                                                  check_outdir->y(),
+                                                  but_w,
+                                                  but_h,
+                                                  "Destination");
+              o->callback(callback::browse_outdir);
+            } /* but_outdir */
         }
         g->resizable(g_inside2);
         g->end();
 
         g_top = new Fl_Group(0, 0, w, but_h + 5);
         {
-            but_add = new Fl_Button(w - 10 - but_w, 5, but_w, but_h, "Open file");
-            but_add->callback(add_callback);
+            { auto o = but_add = new Fl_Button(w - 10 - but_w,
+                                               5,
+                                               but_w,
+                                               but_h,
+                                               "Open file");
+              o->callback(callback::add);
+            } /* but_add */
 
-            infile_label = new Fl_Box(11, 5, but_add->x() - 20, but_h, "(drag and drop a Matroska file)");
-            infile_label->align(FL_ALIGN_LEFT|FL_ALIGN_INSIDE|FL_ALIGN_CLIP);
-            infile_label->box(FL_THIN_DOWN_BOX);
-            infile_label->labelsize(12);
+            { auto o = infile_label = new Fl_Box(11,
+                                                 5,
+                                                 but_add->x() - 20,
+                                                 but_h,
+                                                 "(drag and drop a Matroska file)");
+              o->align(align_left);
+              o->box(FL_THIN_DOWN_BOX);
+              o->labelsize(12);
+            } /* infile_label */
         }
         g_top->resizable(infile_label);
         g_top->end();
 
-        browser = new check_browser(10, but_add->y() + but_add->h() + 5, w - 20, h - but_h*3 - 35);
-        browser->menu(context_menu);
-        browser->callback(browser_cb);
-        browser->clear_visible_focus();
+        { auto o = browser = new check_browser(10,
+                                               but_add->y() + but_add->h() + 5,
+                                               w - 20,
+                                               h - but_h*3 - 35);
+          o->menu(context_menu);
+          o->callback(callback::update_browser);
+          o->clear_visible_focus();
+        } /* browser */
 
-        dnd_area = new dnd_box(browser->x(), browser->y(), browser->w(), browser->h());
-        dnd_area->callback(dnd_callback);
+        { auto o = dnd_area = new dnd_box(browser->x(),
+                                          browser->y(),
+                                          browser->w(),
+                                          browser->h());
+          o->callback(callback::dnd);
+        } /* dnd_area */
     }
     win->end();
     win->resizable(browser);
-    win->position((Fl::w() - win->w()) / 2, (Fl::h() - win->h()) / 2); /* center */
     win->size_range(512, 384, Fl::w(), Fl::h());
+    position_at_center(win);
 
     /* cmd window */
     Fl_Text_Display *disp;
@@ -888,24 +993,45 @@ int mkvextract(const char *in)
 
     cmdWin = new Fl_Double_Window(640, 320, "Command line");
     {
-        cmdBuff = new Fl_Text_Buffer();
-        disp = new Fl_Text_Display(15, 15, cmdWin->w() - 30, cmdWin->h() - 30 - but_h);
-        disp->buffer(cmdBuff);
-        disp->wrap_mode(Fl_Text_Display::WRAP_AT_BOUNDS, 2);
+        { auto o = disp = new Fl_Text_Display(15,
+                                              15,
+                                              cmdWin->w() - 30,
+                                              cmdWin->h() - 30 - but_h);
+          o->buffer(buffer);
+          o->wrap_mode(Fl_Text_Display::WRAP_AT_BOUNDS, 2);
+        } /* disp */
 
-        g_cmd = new Fl_Group(0, disp->h() + disp->y(), cmdWin->w(), cmdWin->h() - disp->h() - disp->y());
+        g_cmd = new Fl_Group(0,
+                             disp->h() + disp->y(),
+                             cmdWin->w(),
+                             cmdWin->h() - disp->h() - disp->y());
         {
-            but_close = new Fl_Button(cmdWin->w() - 110 - 15, disp->h() + disp->y() + 6, 110, but_h, "Close");
-            but_close->callback(close_cmdWin_cb);
-            but_copy = new Fl_Button(but_close->x() - 150 - 5, but_close->y(), 150, but_h, "Copy to clipboard");
-            but_copy->callback(clipboard_cb);
-            dummy2 = new Fl_Box(but_copy->x() - 1, but_copy->y(), 1, 1);
+            { auto o = but_close = new Fl_Button(cmdWin->w() - 110 - 15,
+                                                 disp->h() + disp->y() + 6,
+                                                 110,
+                                                 but_h,
+                                                 "Close");
+              o->callback(callback::close_cmdWin);
+            } /* but_close */
+
+            { auto o = but_copy = new Fl_Button(but_close->x() - 150 - 5,
+                                                but_close->y(),
+                                                150,
+                                                but_h,
+                                                "Copy to clipboard");
+              o->callback(callback::clipboard, buffer);
+            } /* but_copy */
+
+            dummy2 = new Fl_Box(but_copy->x() - 1,
+                                but_copy->y(),
+                                1,
+                                1);
         }
         g_cmd->end();
         g_cmd->resizable(dummy2);
     }
-    cmdWin->position((Fl::w() - cmdWin->w()) / 2, (Fl::h() - cmdWin->h()) / 2); /* center */
     cmdWin->resizable(disp);
+    position_at_center(cmdWin);
 
     if (in && *in) {
         if (fl_filename_isdir(in)) {
@@ -930,15 +1056,17 @@ int mkvextract(const char *in)
 
     lock();
 
-    mkv_file_info_create_thread();
+    if (!file.empty()) {
+        thread::start_mkvinfo();
+    }
 
     /* uncomment to test rotating animation */
-    //Fl::add_timeout(img_duration, th);
+    //Fl::add_timeout(rotate::speed, rotate::handle);
 
     /* run */
     int rv = Fl::run();
 
-    mkvextract_cleanup();
+    mkvextract::cleanup();
 
     return rv;
 }

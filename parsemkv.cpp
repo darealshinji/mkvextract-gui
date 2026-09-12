@@ -36,9 +36,9 @@
 #include "codecs.h"
 
 
-inline static bool checkLine(std::string &line, const std::string str)
+static inline bool check_line(std::string &line, const std::string str)
 {
-    if (line.substr(0, str.size()) == str) {
+    if (line.starts_with(str)) {
         line.erase(0, str.size());
         return true;
     }
@@ -46,8 +46,8 @@ inline static bool checkLine(std::string &line, const std::string str)
     return false;
 }
 
-template<class T, typename U>
-void replace_last_entry(T &vec, U &str) {
+template<typename T>
+void add_entry(std::vector<std::string> &vec, T &str) {
     vec.pop_back();
     vec.push_back(str);
 }
@@ -78,21 +78,18 @@ bool parsemkv(std::string &mkv_file
         return false;
     }
 
-    char *args[] = {
-        const_cast<char *>("mkvinfo"),
-        const_cast<char *>("--no-bom"),
-        const_cast<char *>("--ui-language"),
-        const_cast<char *>("en_US"),
-        const_cast<char *>(mkv_file.c_str()),
-        NULL
+    const char *args[] = {
+        "mkvinfo", "--no-bom", "--ui-language", "en_US", mkv_file.c_str(), NULL
     };
 
-    if ((fp = popen_vp(args, pid)) == NULL) {
+    if ((fp = popen_vp(const_cast<char **>(args), pid)) == NULL) {
         error = "mkvinfo has returned an error";
         return false;
     }
 
-    if (getline(&buf, &n, fp) == -1 || !buf || strcmp(buf, "+ EBML head\n") != 0) {
+    if (getline(&buf, &n, fp) == -1 ||
+        strcmp(buf, "+ EBML head\n") != 0)
+    {
         error = "malformed mkvinfo output";
         fclose(fp);
         return false;
@@ -148,20 +145,20 @@ bool parsemkv(std::string &mkv_file
                 track_entry = tnone;
                 continue;
             }
-            else if (checkLine(line, S_codecid)) {
-                replace_last_entry(codecid, line);
+            else if (check_line(line, S_codecid)) {
+                add_entry(codecid, line);
                 continue;
             }
-            else if (checkLine(line, S_duration)) {
-                replace_last_entry(duration, line);
+            else if (check_line(line, S_duration)) {
+                add_entry(duration, line);
                 continue;
             }
-            else if (checkLine(line, S_name)) {
-                replace_last_entry(name, line);
+            else if (check_line(line, S_name)) {
+                add_entry(name, line);
                 continue;
             }
-            else if (checkLine(line, S_language)) {
-                replace_last_entry(language, line);
+            else if (check_line(line, S_language)) {
+                add_entry(language, line);
                 continue;
             }
             else if (line.starts_with("|+")) {
@@ -170,40 +167,40 @@ bool parsemkv(std::string &mkv_file
             }
 
             if (track_entry == tnone) {
-                if (checkLine(line, S_taudio)) {
+                if (check_line(line, S_taudio)) {
                     track_entry = taudio;
                     continue;
                 }
-                else if (checkLine(line, S_tvideo)) {
+                else if (check_line(line, S_tvideo)) {
                     track_entry = tvideo;
                     continue;
                 }
             }
             else if (track_entry == tvideo) {
-                if (checkLine(line, S_width)) {
-                    replace_last_entry(width, line);
+                if (check_line(line, S_width)) {
+                    add_entry(width, line);
                     continue;
                 }
-                else if (checkLine(line, S_height)) {
+                else if (check_line(line, S_height)) {
                     line = "x" + line;
-                    replace_last_entry(height, line);
+                    add_entry(height, line);
                     continue;
                 }
             }
             else if (track_entry == taudio) {
-                if (checkLine(line, S_channels)) {
+                if (check_line(line, S_channels)) {
                     line += " channels";
-                    replace_last_entry(channels, line);
+                    add_entry(channels, line);
                     continue;
                 }
-                else if (checkLine(line, S_freq)) {
+                else if (check_line(line, S_freq)) {
                     line = ", " + line + "Hz";
-                    replace_last_entry(freq, line);
+                    add_entry(freq, line);
                     continue;
                 }
 
                 /* no entry means mono */
-                replace_last_entry(channels, "1 channel");
+                add_entry(channels, "1 channel");
             }
         } else if (line == "|+ Tracks") {
           tracks_begin = true;
@@ -225,17 +222,17 @@ bool parsemkv(std::string &mkv_file
             fdata.push_back("");
             continue;
         }
-        else if (checkLine(line, S_filename)) {
-            replace_last_entry(filename, line);
+        else if (check_line(line, S_filename)) {
+            add_entry(filename, line);
             continue;
         }
-        else if (checkLine(line, S_mime)) {
-            replace_last_entry(mime, line);
+        else if (check_line(line, S_mime)) {
+            add_entry(mime, line);
             continue;
         }
-        else if (checkLine(line, S_fdata)) {
+        else if (check_line(line, S_fdata)) {
             line += " bytes";
-            replace_last_entry(fdata, line);
+            add_entry(fdata, line);
             continue;
         }
         else if (line == "|+ Chapters") {
