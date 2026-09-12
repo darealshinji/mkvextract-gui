@@ -29,7 +29,6 @@
 #include <FL/Fl_Check_Button.H>
 #include <FL/Fl_File_Chooser.H>
 #include <FL/Fl_Native_File_Chooser.H>
-#include <FL/Fl_PNG_Image.H>
 #include <FL/Fl_SVG_Image.H>
 #include <FL/Fl_Text_Display.H>
 #include <FL/Fl_Double_Window.H>
@@ -52,12 +51,28 @@
 #include <unistd.h>
 
 #include "dnd.hpp"
-#include "mkvtoolnix/icon.h"
 #include "check_browser.hpp"
 #include "parsemkv.hpp"
 #include "xml2ogm.hpp"
 
 namespace fs = std::filesystem;
+
+
+static const char svg_rotation_template[] =
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+    "<svg width=\"1024\" height=\"1024\" version=\"1.1\" viewBox=\"0 0 270.93 270.93\""
+    " xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\">"
+        "<g transform=\"matrix(.82922 0 0 .82922 23.133 1.5165)\" stroke-width=\"0\">"
+            "<rect transform=\"rotate(0)\"   x=\"0\"       y=\"152.81\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
+            "<rect transform=\"rotate(45)\"  x=\"74.544\"  y=\"9.7088\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
+            "<rect transform=\"rotate(90)\"  x=\"26.067\"  y=\"-144.19\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
+            "<rect transform=\"rotate(135)\" x=\"-117.03\" y=\"-218.73\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
+            "<rect transform=\"rotate(0)\"   x=\"181.1\"   y=\"152.81\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
+            "<rect transform=\"rotate(45)\"  x=\"255.64\"  y=\"9.7088\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
+            "<rect transform=\"rotate(90)\"  x=\"207.17\"  y=\"-144.19\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
+            "<rect transform=\"rotate(135)\" x=\"64.064\"  y=\"-218.73\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
+        "</g>"
+    "</svg>";
 
 
 static const float img_duration = 0.1;  /* seconds */
@@ -97,43 +112,43 @@ static std::vector<std::string> args;
 
 
 static inline void lock() {
-  Fl::lock();
+    Fl::lock();
 }
 
 static inline void unlock() {
-  Fl::unlock();
-  Fl::awake();
+    Fl::unlock();
+    Fl::awake();
 }
 
 static FILE *popen_mkvextract()
 {
-  enum { r = 0, w = 1 };
-  int fd[2];
+    enum { r = 0, w = 1 };
+    int fd[2];
 
-  if (pipe(fd) == -1) {
-    return NULL;
-  }
+    if (pipe(fd) == -1) {
+        return NULL;
+    }
 
-  if ((child_pid = fork()) != 0) {
+    if ((child_pid = fork()) != 0) {
+        close(fd[w]);
+        return fdopen(fd[r], "r");
+    }
+
+    size_t len = args.size();
+    auto child_argv = new char *[len + 1];
+
+    for (size_t i = 0; i < len; i++) {
+        child_argv[i] = const_cast<char *>(args.at(i).c_str());
+    }
+    child_argv[len] = NULL;
+
+    close(fd[r]);
+    dup2(fd[w], 1);
     close(fd[w]);
-    return fdopen(fd[r], "r");
-  }
+    execvp("mkvextract", child_argv);
 
-  size_t len = args.size();
-  auto child_argv = new char *[len + 1];
-
-  for (size_t i = 0; i < len; i++) {
-    child_argv[i] = const_cast<char *>(args.at(i).c_str());
-  }
-  child_argv[len] = NULL;
-
-  close(fd[r]);
-  dup2(fd[w], 1);
-  close(fd[w]);
-  execvp("mkvextract", child_argv);
-
-  delete[] child_argv;
-  _exit(127);
+    delete[] child_argv;
+    _exit(127);
 }
 
 
@@ -162,35 +177,49 @@ static void replace_str(const std::string &from, const std::string &to, std::str
 
 static std::string quote_filename(const std::string in)
 {
-  std::string str = in;
+    std::string str = "'";
 
-  replace_str("\n", "\\n", str);
-  replace_str("'", "'\\''", str);
+    for (auto &c : in) {
+        switch(c)
+        {
+        case '\n':
+            str += "\\n";
+            break;
+        case '\\':
+            str += "\\\\";
+            break;
+        case '\'':
+            str += "'\\''";
+            break;
+        default:
+            str += c;
+            break;
+        }
+    }
 
-  str.insert(0, 1, '\'');
-  str += '\'';
+    str += "'";
 
-  return str;
+    return str;
 }
 
 
 static bool file_is_matroska(std::string &file)
 {
-  FILE *fp;
-  unsigned char bytes[4];
+    FILE *fp;
+    unsigned char bytes[4];
 
-  if (file.empty() || !(fp = fopen(file.c_str(), "r"))) {
-    return false;
-  }
+    if (file.empty() || !(fp = fopen(file.c_str(), "r"))) {
+        return false;
+    }
 
-  if (fread(bytes, 1, sizeof(bytes), fp) < sizeof(bytes)) {
+    if (fread(bytes, 1, sizeof(bytes), fp) < sizeof(bytes)) {
+        fclose(fp);
+        return false;
+    }
+
     fclose(fp);
-    return false;
-  }
 
-  fclose(fp);
-
-  return (memcmp(bytes, "\x1A\x45\xDF\xA3", 4) == 0);
+    return (memcmp(bytes, "\x1A\x45\xDF\xA3", 4) == 0);
 }
 
 
@@ -732,33 +761,15 @@ static void mkvextract_init()
 
   free(p);
 
-  /* fontconfig */
+  /* init fontconfig */
   FcInit();
 
-  Fl::scheme("fc+");
-  Fl::visual(FL_DOUBLE | FL_INDEX);
+  /* create rotation symbols */
+  char buf[sizeof(svg_rotation_template) + 16];
 
-  /* rotation symbol */
-
-  const char svg_template[] =
-    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-    "<svg width=\"1024\" height=\"1024\" version=\"1.1\" viewBox=\"0 0 270.93 270.93\" xmlns=\"http://www.w3.org/2000/svg\">"
-    "<g transform=\"matrix(.82922 0 0 .82922 23.133 1.5165)\" stroke-width=\"0\">"
-    "<rect transform=\"rotate(0)\"   x=\"0\"       y=\"152.81\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-    "<rect transform=\"rotate(45)\"  x=\"74.544\"  y=\"9.7088\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-    "<rect transform=\"rotate(90)\"  x=\"26.067\"  y=\"-144.19\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-    "<rect transform=\"rotate(135)\" x=\"-117.03\" y=\"-218.73\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-    "<rect transform=\"rotate(0)\"   x=\"181.1\"   y=\"152.81\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-    "<rect transform=\"rotate(45)\"  x=\"255.64\"  y=\"9.7088\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-    "<rect transform=\"rotate(90)\"  x=\"207.17\"  y=\"-144.19\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-    "<rect transform=\"rotate(135)\" x=\"64.064\"  y=\"-218.73\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-    "</g>"
-    "</svg>";
-
-  char buf[sizeof(svg_template) + 16];
-
-  /* color values */
-  std::vector<const char *> v = { "555", "999", "ddd", "000", "000", "000", "000", "000" };
+  std::vector<const char *> v = { /* color values */
+    "555", "999", "ddd", "000", "000", "000", "000", "000"
+  };
 
   for (size_t i = 0; i < v.size(); i++) {
     if (i > 0) {
@@ -767,14 +778,10 @@ static void mkvextract_init()
       v.pop_back();
     }
 
-    snprintf(buf, sizeof(buf), svg_template, v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]);
+    snprintf(buf, sizeof(buf), svg_rotation_template, v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]);
     img_rotate.push_back(new Fl_SVG_Image(NULL, buf));
     img_rotate.back()->resize(but_h, but_h);
   }
-
-  /* window icon */
-  static Fl_PNG_Image icon(NULL, icon_png, icon_png_len);
-  Fl_Window::default_icon(&icon);
 }
 
 static void mkvextract_cleanup()
@@ -929,7 +936,7 @@ int mkvextract(const char *in)
     cmdWin->resizable(disp);
   }
 
-  if (in) {
+  if (in && *in) {
     if (fl_filename_isdir(in)) {
       fl_message_title("Error");
       fl_message("`%s' is a directory!", in);

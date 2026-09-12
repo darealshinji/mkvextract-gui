@@ -14,9 +14,9 @@ static void print_info()
   const int minor = (version % 10000) / 100;
   const int patch = version % 100;
 
-  std::cout << "using FLTK " << major << "." << minor << "." << patch << " - http://fltk.org/\n"
-    << "window icon was taken from mkvtoolnix - https://mkvtoolnix.download/\n"
-    << "source code available at https://github.com/darealshinji/mkvextract-gui" << std::endl;
+  std::cout << "https://github.com/darealshinji/mkvextract-gui\n"
+    << "using FLTK " << major << "." << minor << "." << patch << " - http://fltk.org/"
+    << std::endl;
 }
 
 
