@@ -13,7 +13,8 @@ OBJS = main.o mkvextract.o parsemkv.o xml2ogm.o
 TINYXML2_LIBS = $(shell $(PKG_CONFIG) --libs tinyxml2 2>/dev/null)
 
 ifeq ($(TINYXML2_LIBS), )
-OBJS += tinyxml2.o
+OBJS     += tinyxml2/tinyxml2.o
+CXXFLAGS += -Itinyxml2
 else
 LIBS += $(TINYXML2_LIBS)
 endif
@@ -26,4 +27,9 @@ clean:
 
 $(BIN): $(OBJS)
 	$(CXX) -o $@ $^ $(LDFLAGS) $(LIBS)
+
+mkvextract.cpp: dnd.hpp check_browser.hpp parsemkv.hpp xml2ogm.hpp
+parsemkv.cpp: parsemkv.hpp codecs.h
+tinyxml2.cpp: tinyxml2.h
+xml2ogm.cpp: xml2ogm.hpp
 

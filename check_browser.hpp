@@ -30,41 +30,40 @@
 
 class check_browser : public Fl_Check_Browser
 {
-  Fl_Menu_Item *_menu;
+    Fl_Menu_Item *m_menu;
 
 public:
-  check_browser(int X, int Y, int W, int H, const char *L=NULL)
-  : Fl_Check_Browser(X, Y, W, H, L)
-  {
-    box(FL_THIN_DOWN_BOX);
-    color(fl_lighter(fl_lighter(FL_BACKGROUND_COLOR)));
-    when(FL_WHEN_CHANGED);
-  }
+    check_browser(int X, int Y, int W, int H, const char *L=NULL)
+    : Fl_Check_Browser(X, Y, W, H, L)
+    {
+        box(FL_THIN_DOWN_BOX);
+        color(fl_lighter(fl_lighter(FL_BACKGROUND_COLOR)));
+        when(FL_WHEN_CHANGED);
+    }
 
-  ~check_browser() {
-    Fl_Check_Browser::clear();
-  }
+    ~check_browser() {
+        Fl_Check_Browser::clear();
+    }
 
-  void menu(Fl_Menu_Item *m) {
-    _menu = m;
-  }
+    void menu(Fl_Menu_Item *m) {
+        m_menu = m;
+    }
 
 protected:
 
-  int handle(int event)
-  {
-    if (event == FL_PUSH) {
-      if (Fl::event_button() == FL_RIGHT_MOUSE) {
-        const Fl_Menu_Item *m = _menu->popup(Fl::event_x(), Fl::event_y());
-        if (m) {
-          m->do_callback(NULL);
-        }
-        return 1;
-      }
-      deselect();
-    }
+    int handle(int event)
+    {
+        if (event == FL_PUSH) {
+            if (Fl::event_button() == FL_RIGHT_MOUSE) {
+                auto m = m_menu->popup(Fl::event_x(), Fl::event_y());
+                if (m) m->do_callback(NULL);
+                return 1;
+            }
 
-    return Fl_Check_Browser::handle(event);
-  }
+            deselect();
+        }
+
+        return Fl_Check_Browser::handle(event);
+    }
 };
 

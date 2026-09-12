@@ -48,153 +48,161 @@ CHAPTER02NAME=Chapter 02
 #include <fstream>
 #include <string.h>
 #include <stdio.h>
-#include "tinyxml2.h"
+#include <tinyxml2.h>
+#include "xml2ogm.hpp"
 
 
 bool xml2ogm(const char *input, const char *output)
 {
-  std::string ogm;
-  std::ofstream ofs;
-  tinyxml2::XMLDocument xmlDoc;
-  int val;
+    std::string ogm;
+    std::ofstream ofs;
+    tinyxml2::XMLDocument xmlDoc;
+    int val;
 
-  if (!input || !output || strlen(input) < 1 || strlen(output) < 1) {
-    return false;
-  }
-
-  if (xmlDoc.LoadFile(input) != tinyxml2::XML_SUCCESS) {
-    return false;
-  }
-
-  auto p = xmlDoc.FirstChildElement("Chapters");
-  if (!p) {
-    return false;
-  }
-
-  /* EditionEntry */
-
-  auto pEE = p->FirstChildElement("EditionEntry");
-
-  while (pEE) {
-    val = 0;
-    p = pEE->FirstChildElement("EditionFlagHidden");
-
-    if (!p || p->QueryIntText(&val) != tinyxml2::XML_SUCCESS || val == 0) {
-      break;
-    }
-    pEE = pEE->NextSiblingElement("EditionEntry");
-  }
-
-  if (!pEE) {
-    return false;
-  }
-
-  /* ChapterAtom */
-
-  auto pCA = pEE->FirstChildElement("ChapterAtom");
-  if (!pCA) {
-    return false;
-  }
-
-  for (int i = 1; pCA != nullptr && i < 100; ++i,
-       pCA = pCA->NextSiblingElement("ChapterAtom"))
-  {
-    int h, m;
-    float s;
-    const char *label = NULL, *time = NULL, *fmt = NULL;
-    char buf[64];
-    tinyxml2::XMLElement *pCD;
-
-    /* hidden flag */
-    val = 0;
-    p = pCA->FirstChildElement("ChapterFlagHidden");
-    if (p && (p->QueryIntText(&val) != tinyxml2::XML_SUCCESS || val != 0)) {
-      continue;
+    if (!input || !output || strlen(input) < 1 || strlen(output) < 1) {
+        return false;
     }
 
-    /* enabled flag */
-    val = 1;
-    p = pCA->FirstChildElement("ChapterFlagEnabled");
-    if (p && (p->QueryIntText(&val) != tinyxml2::XML_SUCCESS || val != 1)) {
-      continue;
+    if (xmlDoc.LoadFile(input) != tinyxml2::XML_SUCCESS) {
+        return false;
     }
 
-    /* chapter title */
-    pCD = pCA->FirstChildElement("ChapterDisplay");
+    auto p = xmlDoc.FirstChildElement("Chapters");
 
-    while (pCD) {
-      const char *lang = NULL, *text = NULL;
-
-      p = pCD->FirstChildElement("ChapterString");
-      if (p) {
-        text = p->GetText();
-      }
-
-      p = pCD->FirstChildElement("ChapterLanguage");
-      if (p) {
-        lang = p->GetText();
-      }
-
-      if (text && !label) {
-        label = text;
-      }
-
-      /* prefer English entries */
-      if (text && lang && strcmp("eng", lang) == 0) {
-        label = text;
-        break;
-      }
-
-      pCD = pCD->NextSiblingElement("ChapterDisplay");
-    }
-
-    /* chapter time */
-    p = pCA->FirstChildElement("ChapterTimeStart");
     if (!p) {
-      return false;
+        return false;
     }
 
-    time = p->GetText();
-    if (!time) {
-      return false;
+    /* EditionEntry */
+
+    auto pEE = p->FirstChildElement("EditionEntry");
+
+    while (pEE) {
+        val = 0;
+        p = pEE->FirstChildElement("EditionFlagHidden");
+
+        if (!p || p->QueryIntText(&val) != tinyxml2::XML_SUCCESS || val == 0) {
+            break;
+        }
+
+        pEE = pEE->NextSiblingElement("EditionEntry");
     }
 
-    if (sscanf(time, "%d:%d:%f", &h, &m, &s) != 3) {
-      return false;
+    if (!pEE) {
+        return false;
     }
 
-    /* check time limits */
-    if (h<0||h>99 || m<0||m>59 || s<0||s>59) {
-      return false;
+    /* ChapterAtom */
+
+    auto pCA = pEE->FirstChildElement("ChapterAtom");
+
+    if (!pCA) {
+        return false;
     }
 
-    /* append ogm entries */
-    if (label) {
-      fmt = "CHAPTER%02d=%02d:%02d:%06.3f\nCHAPTER%02dNAME=";
-      snprintf(buf, sizeof(buf) - 1, fmt, i, h, m, s, i);
-      ogm += buf;
-      ogm += label;
-      ogm.push_back('\n');
-    } else {
-      fmt = "CHAPTER%02d=%02d:%02d:%06.3f\nCHAPTER%02dNAME=Chapter %02d\n";
-      snprintf(buf, sizeof(buf) - 1, fmt, i, h, m, s, i, i);
-      ogm += buf;
+    for (int i = 1; pCA != nullptr && i < 100; ++i,
+        pCA = pCA->NextSiblingElement("ChapterAtom"))
+    {
+        int h, m;
+        float s;
+        const char *label = NULL, *time = NULL, *fmt = NULL;
+        char buf[256];
+
+        /* hidden flag */
+        val = 0;
+        p = pCA->FirstChildElement("ChapterFlagHidden");
+
+        if (p && (p->QueryIntText(&val) != tinyxml2::XML_SUCCESS || val != 0)) {
+            continue;
+        }
+
+        /* enabled flag */
+        val = 1;
+        p = pCA->FirstChildElement("ChapterFlagEnabled");
+
+        if (p && (p->QueryIntText(&val) != tinyxml2::XML_SUCCESS || val != 1)) {
+            continue;
+        }
+
+      /* chapter title */
+      auto pCD = pCA->FirstChildElement("ChapterDisplay");
+
+      while (pCD) {
+          const char *lang = NULL, *text = NULL;
+
+          p = pCD->FirstChildElement("ChapterString");
+
+          if (p) {
+              text = p->GetText();
+          }
+
+          p = pCD->FirstChildElement("ChapterLanguage");
+
+          if (p) {
+              lang = p->GetText();
+          }
+
+          if (text && !label) {
+              label = text;
+          }
+
+          /* prefer English entries */
+          if (text && lang && strcmp("eng", lang) == 0) {
+              label = text;
+              break;
+          }
+
+          pCD = pCD->NextSiblingElement("ChapterDisplay");
+      }
+
+      /* chapter time */
+      p = pCA->FirstChildElement("ChapterTimeStart");
+
+      if (!p) {
+          return false;
+      }
+
+      time = p->GetText();
+
+      if (!time) {
+          return false;
+      }
+
+      if (sscanf(time, "%d:%d:%f", &h, &m, &s) != 3) {
+          return false;
+      }
+
+      /* check time limits */
+      if (h<0||h>99 || m<0||m>59 || s<0||s>59) {
+          return false;
+      }
+
+      /* append ogm entries */
+      if (label) {
+          fmt = "CHAPTER%02d=%02d:%02d:%06.3f\nCHAPTER%02dNAME=";
+          snprintf(buf, sizeof(buf) - 1, fmt, i, h, m, s, i);
+          ogm += buf;
+          ogm += label;
+          ogm.push_back('\n');
+      } else {
+          fmt = "CHAPTER%02d=%02d:%02d:%06.3f\nCHAPTER%02dNAME=Chapter %02d\n";
+          snprintf(buf, sizeof(buf) - 1, fmt, i, h, m, s, i, i);
+          ogm += buf;
+      }
     }
-  }
 
-  if (ogm.empty()) {
-    return false;
-  }
+    if (ogm.empty()) {
+        return false;
+    }
 
-  ofs.open(output);
+    ofs.open(output);
 
-  if (!ofs.is_open()) {
-    return false;
-  }
+    if (!ofs.is_open()) {
+        return false;
+    }
 
-  ofs.write(ogm.c_str(), ogm.length());
-  ofs.close();
+    ofs.write(ogm.c_str(), ogm.length());
 
-  return true;
+    return true;
 }
 
