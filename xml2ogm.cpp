@@ -100,8 +100,7 @@ bool xml2ogm(const char *input, const char *output)
         return false;
     }
 
-    for (int i = 1; pCA != nullptr && i < 100; ++i,
-        pCA = pCA->NextSiblingElement("ChapterAtom"))
+    for (int i = 1; pCA && i < 1000; pCA = pCA->NextSiblingElement("ChapterAtom"), i++)
     {
         int h, m;
         float s;
@@ -124,71 +123,72 @@ bool xml2ogm(const char *input, const char *output)
             continue;
         }
 
-      /* chapter title */
-      auto pCD = pCA->FirstChildElement("ChapterDisplay");
+        /* chapter title */
+        auto pCD = pCA->FirstChildElement("ChapterDisplay");
 
-      while (pCD) {
-          const char *lang = NULL, *text = NULL;
+        while (pCD) {
+            const char *lang = NULL, *text = NULL;
 
-          p = pCD->FirstChildElement("ChapterString");
+            p = pCD->FirstChildElement("ChapterString");
 
-          if (p) {
-              text = p->GetText();
-          }
+            if (p) {
+                text = p->GetText();
+            }
 
-          p = pCD->FirstChildElement("ChapterLanguage");
+            p = pCD->FirstChildElement("ChapterLanguage");
 
-          if (p) {
-              lang = p->GetText();
-          }
+            if (p) {
+                lang = p->GetText();
+            }
 
-          if (text && !label) {
-              label = text;
-          }
+            if (text && !label) {
+                label = text;
+            }
 
-          /* prefer English entries */
-          if (text && lang && strcmp("eng", lang) == 0) {
-              label = text;
-              break;
-          }
+            /* prefer English entries */
+            if (text && lang && strcmp("eng", lang) == 0) {
+                label = text;
+                break;
+            }
 
-          pCD = pCD->NextSiblingElement("ChapterDisplay");
-      }
+            pCD = pCD->NextSiblingElement("ChapterDisplay");
+        }
 
-      /* chapter time */
-      p = pCA->FirstChildElement("ChapterTimeStart");
+        /* chapter time */
+        p = pCA->FirstChildElement("ChapterTimeStart");
 
-      if (!p) {
-          return false;
-      }
+        if (!p) {
+            return false;
+        }
 
-      time = p->GetText();
+        time = p->GetText();
 
-      if (!time) {
-          return false;
-      }
+        if (!time || sscanf(time, "%d:%d:%f", &h, &m, &s) != 3) {
+            return false;
+        }
 
-      if (sscanf(time, "%d:%d:%f", &h, &m, &s) != 3) {
-          return false;
-      }
+        /* check time limits */
+        if (!(h >= 0 && h < 100 &&
+              m >= 0 && m < 60 &&
+              s >= 0 && s < 60))
+        {
+            return false;
+        }
 
-      /* check time limits */
-      if (h<0||h>99 || m<0||m>59 || s<0||s>59) {
-          return false;
-      }
-
-      /* append ogm entries */
-      if (label) {
-          fmt = "CHAPTER%02d=%02d:%02d:%06.3f\nCHAPTER%02dNAME=";
-          snprintf(buf, sizeof(buf) - 1, fmt, i, h, m, s, i);
-          ogm += buf;
-          ogm += label;
-          ogm.push_back('\n');
-      } else {
-          fmt = "CHAPTER%02d=%02d:%02d:%06.3f\nCHAPTER%02dNAME=Chapter %02d\n";
-          snprintf(buf, sizeof(buf) - 1, fmt, i, h, m, s, i, i);
-          ogm += buf;
-      }
+        /* append ogm entries */
+        if (label) {
+            fmt = "CHAPTER%02d=%02d:%02d:%06.3f\n"
+                  "CHAPTER%02dNAME=";
+            snprintf(buf, sizeof(buf) - 1, fmt, i, h, m, s, i);
+            ogm += buf;
+            ogm += label;
+            ogm += '\n';
+        } else {
+            fmt = "CHAPTER%02d=%02d:%02d:%06.3f\n"
+                  "CHAPTER%02dNAME=Chapter %02d\n";
+            snprintf(buf, sizeof(buf) - 1, fmt, i, h, m, s, i, i);
+            ogm += buf;
+        }
     }
 
     if (ogm.empty()) {
