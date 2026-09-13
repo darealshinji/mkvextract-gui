@@ -44,150 +44,179 @@ CHAPTER02=00:21:34.534
 CHAPTER02NAME=Chapter 02
 **/
 
-#include <iostream>
 #include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <regex>
+#include <sstream>
 #include <string.h>
 #include <stdio.h>
 #include <tinyxml2.h>
 #include "mkvextract.hpp"
 
 
+static inline bool empty(const char *str)
+{
+    return (str == NULL || *str == 0);
+}
+
+
+static inline const char *get_text(tinyxml2::XMLElement *elem, const char *label)
+{
+    auto element = elem->FirstChildElement(label);
+
+    return element ? element->GetText() : NULL;
+}
+
+
+static const char *get_chapter_name(tinyxml2::XMLElement *atom)
+{
+    const char *name = NULL;
+
+    for (auto disp = atom->FirstChildElement("ChapterDisplay");
+         disp != NULL;
+         disp = disp->NextSiblingElement("ChapterDisplay"))
+    {
+        const char *str = get_text(disp, "ChapterString");
+
+        if (empty(str)) {
+            continue;
+        }
+
+        /* set to the first string we find */
+        if (!name) {
+            name = str;
+        }
+
+        const char *lang = get_text(disp, "ChapterLanguage");
+
+        /* prefer English entries */
+        if (lang && strcmp("eng", lang) == 0) {
+            return str;
+        }
+    }
+
+    return name;
+}
+
+
+static void save_chapter_entry(tinyxml2::XMLElement *atom, std::string time, int i, std::string &ogm)
+{
+    /* use std::regex to read the time values */
+    std::smatch sm;
+    const std::regex reg("^([0-9]+):([0-9]+):([0-9]+\\.[0-9]+|[0-9]+)");
+
+    if (!std::regex_match(time, sm, reg) || sm.size() != 4) {
+        return;
+    }
+
+    int h = atoi(sm.str(1).c_str());   /* hours */
+    int m = atoi(sm.str(2).c_str());   /* minutes */
+    float s = atof(sm.str(3).c_str()); /* seconds + splitseconds */
+
+    if (m >= 60 || s >= 60.0) {
+        return;
+    }
+
+    /* save numbers to text with precision and width set */
+    char buf_num[32], buf_time[128];
+    snprintf(buf_num, sizeof(buf_num)-1, "%02d", i);
+    snprintf(buf_time, sizeof(buf_time)-1, "%02d:%02d:%06.3f", h, m, s);
+
+    /* OGM format chapter entry */
+    std::stringstream strm;
+    strm << "CHAPTER" << buf_num << '=' << buf_time << '\n'; /* time begin */
+    strm << "CHAPTER" << buf_num << "NAME=";                 /* chapter name */
+
+    /* chapter name */
+    const char *name = get_chapter_name(atom);
+
+    if (empty(name)) {
+        strm << "Chapter " << buf_num << '\n';
+    } else {
+        strm << name << '\n';
+    }
+
+    /* save entry */
+    ogm += strm.str();
+}
+
+
+static inline bool query_int(tinyxml2::XMLElement *elem, int &value)
+{
+    return (elem->QueryIntText(&value) == tinyxml2::XML_SUCCESS);
+}
+
+
 bool xml2ogm(const char *input, const char *output)
 {
     std::string ogm;
     std::ofstream ofs;
-    tinyxml2::XMLDocument xmlDoc;
-    int val;
+    tinyxml2::XMLDocument doc;
+    int val = 0;
 
-    if (!input || !output || strlen(input) < 1 || strlen(output) < 1) {
+    if (empty(input) || empty(output)) {
         return false;
     }
 
-    if (xmlDoc.LoadFile(input) != tinyxml2::XML_SUCCESS) {
+    /* load file and find "Chapters" element */
+
+    if (doc.LoadFile(input) != tinyxml2::XML_SUCCESS) {
         return false;
     }
 
-    auto p = xmlDoc.FirstChildElement("Chapters");
+    auto elem = doc.FirstChildElement("Chapters");
 
-    if (!p) {
+    if (!elem) {
         return false;
     }
 
     /* EditionEntry */
+    auto entry = elem->FirstChildElement("EditionEntry");
 
-    auto pEE = p->FirstChildElement("EditionEntry");
+    for ( ; entry != NULL; entry = entry->NextSiblingElement("EditionEntry")) {
+        elem = entry->FirstChildElement("EditionFlagHidden");
 
-    while (pEE) {
-        val = 0;
-        p = pEE->FirstChildElement("EditionFlagHidden");
-
-        if (!p || p->QueryIntText(&val) != tinyxml2::XML_SUCCESS || val == 0) {
+        if (!elem || (query_int(elem, val) && val == 0)) {
+            /* entry not hidden */
             break;
         }
-
-        pEE = pEE->NextSiblingElement("EditionEntry");
     }
 
-    if (!pEE) {
+    if (!entry) {
         return false;
     }
 
-    /* ChapterAtom */
+    /* ChapterAtom entries */
+    auto atom = entry->FirstChildElement("ChapterAtom");
 
-    auto pCA = pEE->FirstChildElement("ChapterAtom");
-
-    if (!pCA) {
-        return false;
-    }
-
-    for (int i = 1; pCA && i < 1000; pCA = pCA->NextSiblingElement("ChapterAtom"), i++)
+    for (int i = 1; atom != NULL; ++i, atom = atom->NextSiblingElement("ChapterAtom"))
     {
-        int h, m;
-        float s;
-        const char *label = NULL, *time = NULL, *fmt = NULL;
-        char buf[256];
+        elem = atom->FirstChildElement("ChapterFlagHidden");
 
-        /* hidden flag */
-        val = 0;
-        p = pCA->FirstChildElement("ChapterFlagHidden");
-
-        if (p && (p->QueryIntText(&val) != tinyxml2::XML_SUCCESS || val != 0)) {
+        if (elem && query_int(elem, val) && val != 0) {
+            /* entry hidden */
             continue;
         }
 
-        /* enabled flag */
-        val = 1;
-        p = pCA->FirstChildElement("ChapterFlagEnabled");
+        elem = atom->FirstChildElement("ChapterFlagEnabled");
 
-        if (p && (p->QueryIntText(&val) != tinyxml2::XML_SUCCESS || val != 1)) {
+        if (elem && query_int(elem, val) && val == 0) {
+            /* entry not enabled */
             continue;
         }
 
-        /* chapter title */
-        auto pCD = pCA->FirstChildElement("ChapterDisplay");
+        elem = atom->FirstChildElement("ChapterTimeStart");
 
-        while (pCD) {
-            const char *lang = NULL, *text = NULL;
-
-            p = pCD->FirstChildElement("ChapterString");
-
-            if (p) {
-                text = p->GetText();
-            }
-
-            p = pCD->FirstChildElement("ChapterLanguage");
-
-            if (p) {
-                lang = p->GetText();
-            }
-
-            if (text && !label) {
-                label = text;
-            }
-
-            /* prefer English entries */
-            if (text && lang && strcmp("eng", lang) == 0) {
-                label = text;
-                break;
-            }
-
-            pCD = pCD->NextSiblingElement("ChapterDisplay");
+        if (!elem) {
+            continue;
         }
 
-        /* chapter time */
-        p = pCA->FirstChildElement("ChapterTimeStart");
+        const char *time = elem->GetText();
 
-        if (!p) {
-            return false;
-        }
-
-        time = p->GetText();
-
-        if (!time || sscanf(time, "%d:%d:%f", &h, &m, &s) != 3) {
-            return false;
-        }
-
-        /* check time limits */
-        if (!(h >= 0 && h < 100 &&
-              m >= 0 && m < 60 &&
-              s >= 0 && s < 60))
-        {
-            return false;
-        }
-
-        /* append ogm entries */
-        if (label) {
-            fmt = "CHAPTER%02d=%02d:%02d:%06.3f\n"
-                  "CHAPTER%02dNAME=";
-            snprintf(buf, sizeof(buf) - 1, fmt, i, h, m, s, i);
-            ogm += buf;
-            ogm += label;
-            ogm += '\n';
-        } else {
-            fmt = "CHAPTER%02d=%02d:%02d:%06.3f\n"
-                  "CHAPTER%02dNAME=Chapter %02d\n";
-            snprintf(buf, sizeof(buf) - 1, fmt, i, h, m, s, i, i);
-            ogm += buf;
+        /* save OGM format chapter entry */
+        if (!empty(time)) {
+            save_chapter_entry(atom, time, i, ogm);
         }
     }
 
@@ -195,6 +224,7 @@ bool xml2ogm(const char *input, const char *output)
         return false;
     }
 
+    /* save text to file */
     ofs.open(output);
 
     if (!ofs.is_open()) {
