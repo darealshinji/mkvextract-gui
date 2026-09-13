@@ -37,7 +37,7 @@ static void print_info()
     const int patch = version % 100;
 
     std::cout << "https://github.com/darealshinji/mkvextract-gui\n"
-        << "using FLTK " << major << "." << minor << "." << patch << " - http://fltk.org/"
+        << "using FLTK " << major << "." << minor << "." << patch << " - https://www.fltk.org/"
         << std::endl;
 }
 

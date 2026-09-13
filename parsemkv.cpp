@@ -36,6 +36,40 @@
 #include "codecs.h"
 
 
+/* display attachment file sizes in KiB, MiB, etc. */
+static std::string human_readable_size(std::string &line)
+{
+    const long kb = 1024;
+    const long mb = kb * 1024;
+    const long gb = mb * 1024;
+
+    long size = atol(line.c_str());
+
+    if (size >= kb) {
+        const char *unit;
+        char buf[64];
+        double d = size;
+
+        if (size < mb) {
+            d /= kb;
+            unit = " KiB";
+        } else if (size < gb) {
+            d /= mb;
+            unit = " MiB";
+        } else {
+            d /= gb;
+            unit = " GiB";
+        }
+
+        snprintf(buf, sizeof(buf), "%.1f", d);
+
+        return std::string(buf) + unit;
+    }
+
+    return line + " B";
+}
+
+
 static inline bool check_line(std::string &line, const std::string str)
 {
     if (line.starts_with(str)) {
@@ -64,7 +98,7 @@ bool parsemkv(std::string &mkv_file
 {
     std::ifstream ifs;
     std::vector<std::string> codecid, duration, name, language, width, height,
-        freq, channels, filename, mime, fdata;
+        freq, channels, filename, mime, filesize;
     std::string line;
     char *buf = NULL;
     pid_t pid;
@@ -110,7 +144,7 @@ bool parsemkv(std::string &mkv_file
         S_channels = "|   + Channels: ",
         S_filename = "|  + File name: ",
         S_mime =     "|  + MIME type: ",
-        S_fdata =    "|  + File data: size ";
+        S_filesize =    "|  + File data: size ";
 
     enum { tnone = 0, tvideo = 1, taudio = 2 };
     unsigned short track_entry = tnone;
@@ -219,7 +253,7 @@ bool parsemkv(std::string &mkv_file
         if (line == "| + Attached") {
             filename.push_back("");
             mime.push_back("");
-            fdata.push_back("");
+            filesize.push_back("");
             continue;
         }
         else if (check_line(line, S_filename)) {
@@ -230,9 +264,9 @@ bool parsemkv(std::string &mkv_file
             add_entry(mime, line);
             continue;
         }
-        else if (check_line(line, S_fdata)) {
-            line += " bytes";
-            add_entry(fdata, line);
+        else if (check_line(line, S_filesize)) {
+            std::string size_str = human_readable_size(line);
+            add_entry(filesize, size_str);
             continue;
         }
         else if (line == "|+ Chapters") {
@@ -317,7 +351,7 @@ bool parsemkv(std::string &mkv_file
         ss  << "Attachment " << i+1
             << " [" << filename.at(i) << "] ["
             << mime.at(i) << "] ["
-            << fdata.at(i) << "]";
+            << filesize.at(i) << "]";
 
           attachmentInfos.push_back(ss.str());
           attachmentFilenames.push_back(filename.at(i));
