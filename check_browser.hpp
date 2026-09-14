@@ -49,6 +49,10 @@ public:
         m_menu = m;
     }
 
+    Fl_Menu_Item *menu() const {
+        return m_menu;
+    }
+
 protected:
 
     int handle(int event)

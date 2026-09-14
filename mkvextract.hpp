@@ -30,7 +30,7 @@
 #include <unistd.h>
 
 
-namespace mkvextract {
+namespace ex {
     int start(const char *in);
 }
 

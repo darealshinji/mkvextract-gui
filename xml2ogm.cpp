@@ -102,34 +102,44 @@ static const char *get_chapter_name(tinyxml2::XMLElement *atom)
 
 static void save_chapter_entry(tinyxml2::XMLElement *atom, std::string time, int i, std::string &ogm)
 {
-    /* use std::regex to read the time values */
-    std::smatch sm;
-    const std::regex reg("^([0-9]+):([0-9]+):([0-9]+\\.[0-9]+|[0-9]+)");
+    std::smatch match;
+    std::stringstream strm;
+    char buf_num[32];
+    char buf_time[64];
 
-    if (!std::regex_match(time, sm, reg) || sm.size() != 4) {
+    const std::regex reg("^([0-9]+):([0-9]+):([0-9]+)(\\.[0-9]+)?");
+
+    if (!std::regex_match(time, match, reg) || match.size() != 5) {
         return;
     }
 
-    int h = atoi(sm.str(1).c_str());   /* hours */
-    int m = atoi(sm.str(2).c_str());   /* minutes */
-    float s = atof(sm.str(3).c_str()); /* seconds + splitseconds */
+    int h = atoi(match.str(1).c_str());  /* hours */
+    int m = atoi(match.str(2).c_str());  /* minutes */
+    int s = atof(match.str(3).c_str());  /* seconds */
 
-    if (m >= 60 || s >= 60.0) {
+    if (h > 99 || m > 59 || s > 59) {
         return;
     }
 
-    /* save numbers to text with precision and width set */
-    char buf_num[32], buf_time[128];
+    /* milliseconds with exactly three digits */
+    std::string ms = match.str(4);
+
+    if (ms.empty()) {
+        ms = ".000";
+    } else if (ms.size() > 4) {
+        ms.erase(4);
+    } else if (ms.size() < 4) {
+        ms.append(4 - ms.size(), '0');
+    }
+
     snprintf(buf_num, sizeof(buf_num)-1, "%02d", i);
-    snprintf(buf_time, sizeof(buf_time)-1, "%02d:%02d:%06.3f", h, m, s);
+    snprintf(buf_time, sizeof(buf_time)-1, "%02d:%02d:%02d", h, m, s);
+
+    const char *name = get_chapter_name(atom);
 
     /* OGM format chapter entry */
-    std::stringstream strm;
-    strm << "CHAPTER" << buf_num << '=' << buf_time << '\n'; /* time begin */
-    strm << "CHAPTER" << buf_num << "NAME=";                 /* chapter name */
-
-    /* chapter name */
-    const char *name = get_chapter_name(atom);
+    strm << "CHAPTER" << buf_num << '=' << buf_time << ms << '\n';
+    strm << "CHAPTER" << buf_num << "NAME=";
 
     if (empty(name)) {
         strm << "Chapter " << buf_num << '\n';

@@ -53,5 +53,5 @@ int main(int argc, char *argv[])
 
     print_info();
 
-    return mkvextract::start(file);
+    return ex::start(file);
 }
