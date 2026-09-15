@@ -54,6 +54,7 @@
 
 #include "dnd.hpp"
 #include "check_browser.hpp"
+#include "pipe_command.hpp"
 #include "mkvextract.hpp"
 
 namespace fs = std::filesystem;
@@ -123,7 +124,6 @@ namespace th {
     static pthread_t extract, info;
     static bool extract_init = false;
     static bool info_init = false;
-    static pid_t pid = -1;
 
     static void start_mkvinfo();
     static void stop();
@@ -235,6 +235,7 @@ static void th::start_mkvinfo()
 
 extern "C" void *get_mkv_file_info(void *)
 {
+    struct mkv_file_info info;
     std::vector<std::string> tracks, attachments, names1, names2;
     std::string error;
 
@@ -269,15 +270,7 @@ extern "C" void *get_mkv_file_info(void *)
         }
     }
 
-    if (!parsemkv(ex::cfg.file,
-                  tracks,
-                  names1,
-                  attachments,
-                  names2,
-                  ex::cfg.timestampIDs,
-                  ex::cfg.chapters,
-                  error))
-    {
+    if (!parsemkv(ex::cfg.file, info, error)) {
         th::lock();
 
         fl_message_title("Error");
@@ -298,8 +291,10 @@ extern "C" void *get_mkv_file_info(void *)
     }
 
     ex::cfg.outnames.clear();
-    ex::cfg.track_count = tracks.size();
-    ex::cfg.attach_count = attachments.size();
+    ex::cfg.track_count = info.tracks.size();
+    ex::cfg.attach_count = info.attachments.size();
+    ex::cfg.timestampIDs = info.timestampIDs;
+    ex::cfg.chapters = info.has_chapters;
 
     th::lock();
     fltk::browser->clear();
@@ -307,18 +302,18 @@ extern "C" void *get_mkv_file_info(void *)
 
     for (size_t i = 0; i < ex::cfg.track_count; i++) {
         th::lock();
-        fltk::browser->add(tracks.at(i).c_str());
+        fltk::browser->add(info.tracks.at(i).info.c_str());
         th::unlock();
 
-        ex::cfg.outnames.push_back(names1.at(i));
+        ex::cfg.outnames.push_back(info.tracks.at(i).filename);
     }
 
     for (size_t i = 0; i < ex::cfg.attach_count; i++) {
         th::lock();
-        fltk::browser->add(attachments.at(i).c_str());
+        fltk::browser->add(info.attachments.at(i).info.c_str());
         th::unlock();
 
-        ex::cfg.outnames.push_back(names2.at(i));
+        ex::cfg.outnames.push_back(info.attachments.at(i).filename);
     }
 
     th::lock();
@@ -437,18 +432,12 @@ static void cb::add(Fl_Widget *, void *)
 
 extern "C" void *run_extraction_command(void *)
 {
-    FILE *fp;
     std::string base, xml, ogm;
     char *line = NULL;
     size_t n = 0;
 
     const char keyword[] = "#GUI#progress ";
     const size_t keyword_len = sizeof(keyword)-1;
-
-    if (th::pid > getpid()) {
-        kill(th::pid, 1);
-        th::pid = -1;
-    }
 
     if (system("mkvextract --version 2>/dev/null >/dev/null") != 0) {
         th::lock();
@@ -473,7 +462,10 @@ extern "C" void *run_extraction_command(void *)
 
     th::unlock();
 
-    if ((fp = popen_vp(ex::cfg.args, th::pid)) == NULL) {
+    pipe_command cmd(ex::cfg.args);
+    FILE *fp = cmd.pipe_open();
+
+    if (!fp) {
         th::lock();
         fltk::progress_box->label("ERROR");
         ex::cfg.extract_chapters = false;
@@ -488,10 +480,9 @@ extern "C" void *run_extraction_command(void *)
             }
         }
 
+        const char *l = cmd.error() ? "ERROR" : "DONE";
+        cmd.pipe_close();
         free(line);
-        th::pid = -1;
-
-        const char *l = (fclose(fp) == 0) ? "DONE" : "ERROR";
 
         th::lock();
         fltk::progress_box->label(l);
@@ -704,11 +695,6 @@ static void th::stop()
     if (th::info_init) {
         pthread_cancel(th::info);
         th::info_init = false;
-    }
-
-    if (th::pid > getpid()) {
-        kill(th::pid, 1);
-        th::pid = -1;
     }
 }
 

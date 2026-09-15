@@ -24,44 +24,79 @@
 
 #include <vector>
 #include <string>
+#include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
 
+#include "pipe_command.hpp"
 
-FILE *popen_vp(char **argv, pid_t &child_pid)
+
+pipe_command::pipe_command(char **argv)
+: m_argv(argv)
+{}
+
+
+pipe_command::pipe_command(std::vector<std::string> &argv)
+{
+    for (auto &e : argv) {
+        m_vec.push_back(const_cast<char *>(e.c_str()));
+    }
+
+    m_vec.push_back(NULL);
+    m_argv = std::data(m_vec);
+}
+
+
+pipe_command::~pipe_command()
+{
+    pipe_close();
+}
+
+
+FILE *pipe_command::pipe_open()
 {
     enum { r = 0, w = 1 };
     int fd[2];
 
-    if (pipe(fd) == -1) {
+    pipe_close();
+
+    if (!m_argv || pipe2(fd, O_CLOEXEC) == -1) {
         return NULL;
     }
 
-    if ((child_pid = fork()) != 0) {
+    if ((m_pid = vfork()) != 0) {
         close(fd[w]);
-        return fdopen(fd[r], "r");
+        m_fp = fdopen(fd[r], "r");
+        return m_fp;
     }
 
     close(fd[r]);
     dup2(fd[w], 1);
     close(fd[w]);
 
-    execvp(argv[0], argv);
+    execvp(m_argv[0], m_argv);
 
     _exit(127);
 }
 
 
-FILE *popen_vp(std::vector<std::string> &argv, pid_t &child_pid)
+void pipe_command::pipe_close()
 {
-    size_t len = argv.size();
-    char *child_argv[len + 1];
-
-    for (size_t i = 0; i < len; i++) {
-        child_argv[i] = const_cast<char *>(argv.at(i).c_str());
+    if (m_fp) {
+        fclose(m_fp);
+        m_fp = NULL;
     }
 
-    child_argv[len] = NULL;
-
-    return popen_vp(child_argv, child_pid);
+    if (m_pid > getpid()) {
+        kill(m_pid, 1);
+        m_pid = -1;
+    }
 }
+
+
+bool pipe_command::error()
+{
+    return (m_fp && ferror(m_fp) != 0);
+}
+

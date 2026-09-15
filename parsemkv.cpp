@@ -35,6 +35,7 @@
 #include <unistd.h>
 
 #include "mkvextract.hpp"
+#include "pipe_command.hpp"
 #include "codecs.h"
 
 
@@ -113,22 +114,13 @@ static inline bool check_line(std::string &line, const std::string str)
 }
 
 
-bool parsemkv(std::string &mkv_file
-,             std::vector<std::string> &trackInfos
-,             std::vector<std::string> &trackFilenames
-,             std::vector<std::string> &attachmentInfos
-,             std::vector<std::string> &attachmentFilenames
-,             std::vector<int> &timestampIDs
-,             bool &has_chapters
-,             std::string &error)
+bool parsemkv(std::string &mkv_file, struct mkv_file_info &info, std::string &error)
 {
     std::ifstream ifs;
     std::vector<struct track_info> tracks;
     std::vector<struct attachment_info> attachments;
     std::string line;
     char *buf = NULL;
-    pid_t pid;
-    FILE *fp;
     size_t n = 0;
 
     /* run mkvinfo */
@@ -142,7 +134,10 @@ bool parsemkv(std::string &mkv_file
         "mkvinfo", "--no-bom", "--ui-language", "en_US", mkv_file.c_str(), NULL
     };
 
-    if ((fp = popen_vp(const_cast<char **>(args), pid)) == NULL) {
+    pipe_command cmd(const_cast<char **>(args));
+    FILE *fp = cmd.pipe_open();
+
+    if (!fp) {
         error = "cannot read output from mkvinfo";
         return false;
     }
@@ -152,8 +147,7 @@ bool parsemkv(std::string &mkv_file
         strcmp(buf, "+ EBML head\n") != 0)
     {
         error = "malformed mkvinfo output";
-        fclose(fp);
-        //kill(pid, 1);
+        cmd.pipe_close();
         return false;
     }
 
@@ -177,7 +171,7 @@ bool parsemkv(std::string &mkv_file
     unsigned short track_entry = tnone;
 
     bool tracks_begin = false;
-    has_chapters = false;
+    info.has_chapters = false;
 
     /* parse tracks */
     while (getline(&buf, &n, fp) != -1) {
@@ -189,8 +183,8 @@ bool parsemkv(std::string &mkv_file
 
         if (tracks_begin) {
             if (line == "| + Track") {
-                struct track_info info = { .language = "UND" };
-                tracks.push_back(info);
+                struct track_info track_info = { .language = "UND" };
+                tracks.push_back(track_info);
                 track_entry = tnone;
                 continue;
             }
@@ -284,20 +278,17 @@ bool parsemkv(std::string &mkv_file
             continue;
         }
         else if (line == "|+ Chapters") {
-            has_chapters = true;
+            info.has_chapters = true;
             break;
         }
     }
-
-    /* close pipe */
-    fclose(fp);
-    //kill(pid, 1);
 
     for (size_t i = 0; i < tracks.size(); i++) {
         std::stringstream strm1, strm2;
         std::string type;
 
-        switch (tracks.at(i).codecid[0]) {
+        switch (tracks.at(i).codecid[0])
+        {
         case 'V': type = "video"; break;
         case 'A': type = "audio"; break;
         case 'S': type = "subtitles"; break;
@@ -315,13 +306,11 @@ bool parsemkv(std::string &mkv_file
             strm1 << ", " << tracks.at(i).duration << " fps]";
 
             /* for now only extract timestamps of video streams */
-            timestampIDs.push_back(i);
+            info.timestampIDs.push_back(i);
         }
         else if (type == "audio") {
             strm1 << " [" << tracks.at(i).channels << ", " << tracks.at(i).freq << "Hz]";
         }
-
-        trackInfos.push_back(strm1.str());
 
         strm2 << "track_" << i+1 << "_" << type;
 
@@ -333,7 +322,8 @@ bool parsemkv(std::string &mkv_file
             }
         }
 
-        trackFilenames.push_back(strm2.str());
+        struct infos nfo = { strm1.str(), strm2.str() };
+        info.tracks.push_back(nfo);
     }
 
     for (size_t i = 0; i < attachments.size(); i++) {
@@ -342,8 +332,8 @@ bool parsemkv(std::string &mkv_file
         strm << "Attachment " << i+1 << ": " << attachments.at(i).filename;
         strm << " [" << attachments.at(i).filesize << "]";
 
-        attachmentInfos.push_back(strm.str());
-        attachmentFilenames.push_back(attachments.at(i).filename);
+        struct infos nfo = { strm.str(), attachments.at(i).filename };
+        info.attachments.push_back(nfo);
     }
 
     return true;

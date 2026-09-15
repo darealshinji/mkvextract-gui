@@ -22,34 +22,30 @@
  * SOFTWARE.
  */
 
-#pragma once
-
-#include <string>
 #include <vector>
+#include <string>
 #include <stdio.h>
 #include <unistd.h>
 
 
-struct infos {
-    std::string info;
-    std::string filename;
+class pipe_command
+{
+private:
+
+    char **m_argv = NULL;
+    std::vector<char *>m_vec;
+    pid_t m_pid = -1;
+    FILE *m_fp = NULL;
+
+public:
+
+    pipe_command(char **argv);
+    pipe_command(std::vector<std::string> &argv);
+    ~pipe_command();
+
+    FILE *pipe_open();
+    void pipe_close();
+
+    bool error();
 };
-
-struct mkv_file_info {
-    std::vector<struct infos> tracks;
-    std::vector<struct infos> attachments;
-    std::vector<int> timestampIDs;
-    bool has_chapters;
-};
-
-
-namespace ex {
-    int start(const char *in);
-}
-
-FILE *popen_vp(char **argv, pid_t &child_pid);
-FILE *popen_vp(std::vector<std::string> &argv, pid_t &child_pid);
-
-bool parsemkv(std::string &mkv_file, struct mkv_file_info &info, std::string &error);
-bool xml2ogm(const char *input, const char *output);
 
