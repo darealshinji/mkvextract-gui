@@ -952,8 +952,7 @@ int ex::start(const char *in)
           o->clear_visible_focus();
         } /* fltk::browser */
 
-        { auto b = fltk::browser;
-          auto o = fltk::dnd_area = new dnd_box(b->x(), b->y(), b->w(), b->h());
+        { auto o = fltk::dnd_area = new dnd_box(win->x(), win->y(), win->w(), win->h());
           o->callback(cb::dnd);
         } /* fltk::dnd_area */
     }
