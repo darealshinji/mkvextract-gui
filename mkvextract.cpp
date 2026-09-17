@@ -1,26 +1,26 @@
-/*
- * The MIT License (MIT)
- *
- * Copyright (c) 2018-2026 djcj <djcj@gmx.de>
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
+/**
+ Licensed under the MIT License <http://opensource.org/licenses/MIT>.
+ SPDX-License-Identifier: MIT
+ Copyright (c) 2018-2026 Carsten Janssen
+
+ Permission is hereby  granted, free of charge, to any  person obtaining a copy
+ of this software and associated  documentation files (the "Software"), to deal
+ in the Software  without restriction, including without  limitation the rights
+ to  use, copy,  modify, merge,  publish, distribute,  sublicense, and/or  sell
+ copies  of  the Software,  and  to  permit persons  to  whom  the Software  is
+ furnished to do so, subject to the following conditions:
+
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
+
+ THE SOFTWARE  IS PROVIDED "AS  IS", WITHOUT WARRANTY  OF ANY KIND,  EXPRESS OR
+ IMPLIED,  INCLUDING BUT  NOT  LIMITED TO  THE  WARRANTIES OF  MERCHANTABILITY,
+ FITNESS FOR  A PARTICULAR PURPOSE AND  NONINFRINGEMENT. IN NO EVENT  SHALL THE
+ AUTHORS  OR COPYRIGHT  HOLDERS  BE  LIABLE FOR  ANY  CLAIM,  DAMAGES OR  OTHER
+ LIABILITY, WHETHER IN AN ACTION OF  CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE  OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
+**/
 
 #include <FL/Fl.H>
 #include <FL/fl_ask.H>
@@ -43,7 +43,6 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <pthread.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <signal.h>
@@ -55,27 +54,27 @@
 #include "dnd.hpp"
 #include "check_browser.hpp"
 #include "pipe_command.hpp"
+#include "posix_thread.hpp"
 #include "mkvextract.hpp"
 
 namespace fs = std::filesystem;
 
 
-struct config {
-    bool chapters;
-    bool extract_chapters;
-    size_t track_count;
-    size_t attach_count;
-    std::string file;
-    std::string outdir_source;
-    std::string outdir_manual;
-    std::vector<int> timestampIDs;
-    std::vector<std::string> outnames;
-    std::vector<std::string> args;
-};
-
-
 /* MKVextract */
 namespace ex {
+    struct config {
+        bool chapters;
+        bool extract_chapters;
+        size_t track_count;
+        size_t attach_count;
+        std::string file;
+        std::string outdir_source;
+        std::string outdir_manual;
+        std::vector<int> timestampIDs;
+        std::vector<std::string> outnames;
+        std::vector<std::string> args;
+    };
+
     struct config cfg;
 
     static void init(int but_h);
@@ -90,13 +89,10 @@ namespace cb {
     static void browse_outdir(Fl_Widget *);
     static void check_outdir(Fl_Widget *);
     static void clipboard(Fl_Widget *, void *);
-    static void close_cmdWin(Fl_Widget *);
     static void close(Fl_Widget *, void *);
     static void cmd(Fl_Widget *, void *);
     static void dnd(Fl_Widget *);
     static void extract(Fl_Widget *);
-    static void null(Fl_Widget *, void *);
-    static void rotate_timeout(void *);
     static void rotate(Fl_Widget *);
     static void select_all(Fl_Widget *, void *);
     static void select_none(Fl_Widget *, void *);
@@ -116,17 +112,15 @@ namespace fltk {
     static Fl_Box *outdir_field = NULL;
     static Fl_Box *infile_label = NULL;
     static Fl_Check_Button *use_source_path = NULL;
-};
+}
 
 
-/* pthread */
-namespace th {
-    static pthread_t extract, info;
-    static bool extract_init = false;
-    static bool info_init = false;
+namespace thread {
+    static void *get_mkv_file_info(void *);
+    static void *run_extraction_command(void *);
 
-    static void start_mkvinfo();
-    static void stop();
+    static posix_thread info(get_mkv_file_info);
+    static posix_thread extract(run_extraction_command);
 
     static inline void lock() {
         Fl::lock();
@@ -160,13 +154,14 @@ namespace rotate
     static std::vector<Fl_SVG_Image *> array;
     static std::vector<Fl_SVG_Image *>::iterator frame;
     static Fl_Box *box = NULL;
-
-    static Fl_Timeout_Handler handle = cb::rotate_timeout;
     static const float speed = 0.1; /* seconds */
+
+    static Fl_Timeout_Handler handle = [] (void *) {
+        cb::rotate(NULL);
+    };
 }
 
 
-extern "C" void *get_mkv_file_info(void *);
 static std::string create_extraction_command(bool extract);
 
 
@@ -226,26 +221,20 @@ static bool file_is_matroska(std::string &file)
     return (memcmp(bytes, "\x1A\x45\xDF\xA3", 4) == 0);
 }
 
-static void th::start_mkvinfo()
-{
-    if (pthread_create(&th::info, NULL, &get_mkv_file_info, NULL) == 0) {
-        th::info_init = true;
-    }
-}
 
-extern "C" void *get_mkv_file_info(void *)
+static void *thread::get_mkv_file_info(void *)
 {
     struct mkv_file_info info;
     std::vector<std::string> tracks, attachments, names1, names2;
     std::string error;
 
-    th::lock();
+    thread::lock();
     fltk::dnd_area->deactivate();
     fltk::but_add->deactivate();
-    th::unlock();
+    thread::unlock();
 
     while (!file_is_matroska(ex::cfg.file)) {
-        th::lock();
+        thread::lock();
 
         fl_message_title("Warning");
 
@@ -254,14 +243,14 @@ extern "C" void *get_mkv_file_info(void *)
             "Do you want to continue anyway?",
             "   Stop   ", "Continue", "Try again");
 
-        th::unlock();
+        thread::unlock();
 
         if (rv == 0) {
             /* stop */
-            th::lock();
+            thread::lock();
             fltk::dnd_area->activate();
             fltk::but_add->activate();
-            th::unlock();
+            thread::unlock();
 
             return NULL;
         } else if (rv == 1) {
@@ -271,14 +260,14 @@ extern "C" void *get_mkv_file_info(void *)
     }
 
     if (!parsemkv(ex::cfg.file, info, error)) {
-        th::lock();
+        thread::lock();
 
         fl_message_title("Error");
         fl_message("%s", error.c_str());
         fltk::dnd_area->activate();
         fltk::but_add->activate();
 
-        th::unlock();
+        thread::unlock();
 
         return NULL;
     }
@@ -296,27 +285,27 @@ extern "C" void *get_mkv_file_info(void *)
     ex::cfg.timestampIDs = info.timestampIDs;
     ex::cfg.chapters = info.has_chapters;
 
-    th::lock();
+    thread::lock();
     fltk::browser->clear();
-    th::unlock();
+    thread::unlock();
 
     for (size_t i = 0; i < ex::cfg.track_count; i++) {
-        th::lock();
+        thread::lock();
         fltk::browser->add(info.tracks.at(i).info.c_str());
-        th::unlock();
+        thread::unlock();
 
         ex::cfg.outnames.push_back(info.tracks.at(i).filename);
     }
 
     for (size_t i = 0; i < ex::cfg.attach_count; i++) {
-        th::lock();
+        thread::lock();
         fltk::browser->add(info.attachments.at(i).info.c_str());
-        th::unlock();
+        thread::unlock();
 
         ex::cfg.outnames.push_back(info.attachments.at(i).filename);
     }
 
-    th::lock();
+    thread::lock();
 
     if (ex::cfg.chapters) {
         fltk::browser->add("Chapters (xml + ogm/txt)");
@@ -329,13 +318,19 @@ extern "C" void *get_mkv_file_info(void *)
     menu->activate();
     menu->next()->activate();
 
+    /* update widgets */
     fltk::infile_label->copy_label(ex::cfg.file.c_str());
     fltk::use_source_path->activate();
     fltk::dnd_area->activate();
     fltk::but_add->activate();
+    fltk::but_extract->deactivate();
+    fltk::but_cmd->deactivate();
+    fltk::progress_box->label(NULL);
+    cb::check_outdir(NULL);
+
     Fl::redraw();
 
-    th::unlock();
+    thread::unlock();
 
     return NULL;
 }
@@ -369,11 +364,6 @@ static void cb::rotate(Fl_Widget *)
     Fl::repeat_timeout(rotate::speed, rotate::handle);
 }
 
-static void cb::rotate_timeout(void *)
-{
-    cb::rotate(NULL);
-}
-
 static void cb::dnd(Fl_Widget *)
 {
     std::string items(Fl::event_text());
@@ -388,10 +378,10 @@ static void cb::dnd(Fl_Widget *)
             fl_decode_uri(copy);
             ex::cfg.file = copy + 7;
             free(copy);
-            th::start_mkvinfo();
+            thread::info.start();
         } else if (items.starts_with('/')) {
             ex::cfg.file = items;
-            th::start_mkvinfo();
+            thread::info.start();
         }
     }
 }
@@ -426,11 +416,11 @@ static void cb::add(Fl_Widget *, void *)
 
     if (fc.show() == 0 && (ptr = fc.filename()) != NULL && *ptr != 0) {
         ex::cfg.file = ptr;
-        th::start_mkvinfo();
+        thread::info.start();
     }
 }
 
-extern "C" void *run_extraction_command(void *)
+static void *thread::run_extraction_command(void *)
 {
     std::string base, xml, ogm;
     char *line = NULL;
@@ -440,16 +430,16 @@ extern "C" void *run_extraction_command(void *)
     const size_t keyword_len = sizeof(keyword)-1;
 
     if (system("mkvextract --version 2>/dev/null >/dev/null") != 0) {
-        th::lock();
+        thread::lock();
         fl_message_title("Error");
         fl_message("%s", "mkvextract doesn't seem to be in PATH!");
-        th::unlock();
+        thread::unlock();
         return NULL;
     }
 
     create_extraction_command(true);
 
-    th::lock();
+    thread::lock();
 
     fltk::dnd_area->deactivate();
     fltk::use_source_path->deactivate();
@@ -460,23 +450,23 @@ extern "C" void *run_extraction_command(void *)
     fltk::but_extract->callback(cb::abort);
     Fl::add_timeout(rotate::speed, rotate::handle);
 
-    th::unlock();
+    thread::unlock();
 
     pipe_command cmd(ex::cfg.args);
     FILE *fp = cmd.pipe_open();
 
     if (!fp) {
-        th::lock();
+        thread::lock();
         fltk::progress_box->label("ERROR");
         ex::cfg.extract_chapters = false;
-        th::unlock();
+        thread::unlock();
     } else {
         while (getline(&line, &n, fp) != -1) {
             if (line && strncmp(line, keyword, keyword_len) == 0) {
-                th::lock();
+                thread::lock();
                 /* trailing newline is ignored by label() */
                 fltk::progress_box->copy_label(line + keyword_len);
-                th::unlock();
+                thread::unlock();
             }
         }
 
@@ -484,14 +474,14 @@ extern "C" void *run_extraction_command(void *)
         cmd.pipe_close();
         free(line);
 
-        th::lock();
+        thread::lock();
         fltk::progress_box->label(l);
-        th::unlock();
+        thread::unlock();
     }
 
-    th::lock();
+    thread::lock();
     restore_main_window();
-    th::unlock();
+    thread::unlock();
 
     if (ex::cfg.chapters && ex::cfg.extract_chapters) {
         if (fltk::use_source_path->value() == true) {
@@ -504,10 +494,10 @@ extern "C" void *run_extraction_command(void *)
         ogm = base + " - chapters.txt";
 
         if (!xml2ogm(xml.c_str(), ogm.c_str())) {
-            th::lock();
+            thread::lock();
             fl_message_title("Error");
             fl_message("%s", "Could not create OGM format chapters from XML!");
-            th::unlock();
+            thread::unlock();
         }
     }
 
@@ -661,11 +651,6 @@ static void cb::clipboard(Fl_Widget *, void *p)
     free(text);
 }
 
-static void cb::close_cmdWin(Fl_Widget *)
-{
-    fltk::cmdWin->hide();
-}
-
 static void cb::cmd(Fl_Widget *, void *p)
 {
     std::string command = create_extraction_command(false);
@@ -680,27 +665,13 @@ static void cb::extract(Fl_Widget *)
         fltk::cmdWin->hide();
     }
 
-    if (pthread_create(&th::extract, NULL, &run_extraction_command, NULL) == 0) {
-        th::extract_init = true;
-    }
-}
-
-static void th::stop()
-{
-    if (th::extract_init) {
-        pthread_cancel(th::extract);
-        th::extract_init = false;
-    }
-
-    if (th::info_init) {
-        pthread_cancel(th::info);
-        th::info_init = false;
-    }
+    thread::extract.start();
 }
 
 static void cb::abort(Fl_Widget *)
 {
-    th::stop();
+    thread::extract.cancel();
+    thread::info.cancel();
     fltk::progress_box->label("STOPPED");
     restore_main_window();
 }
@@ -733,7 +704,8 @@ static void cb::update_browser(Fl_Widget *)
 
 static void cb::close(Fl_Widget *, void *p)
 {
-    th::stop();
+    thread::extract.cancel();
+    thread::info.cancel();
     fltk::cmdWin->hide();
     reinterpret_cast<Fl_Double_Window *>(p)->hide();
 }
@@ -748,10 +720,6 @@ static void cb::select_none(Fl_Widget *, void *)
 {
     fltk::browser->check_none();
     cb::update_browser(NULL);
-}
-
-static void cb::null(Fl_Widget *, void *)
-{
 }
 
 static void ex::init(int but_h)
@@ -810,13 +778,10 @@ static void ex::init(int but_h)
     };
 
     for (const char *e : paths) {
-        if (fs::is_regular_file(fs::status(e))) {
-            Fl_PNG_Image icon(e);
+        Fl_PNG_Image icon(e);
 
-            if (!icon.fail()) {
-                Fl_Window::default_icon(&icon);
-            }
-
+        if (!icon.fail()) {
+            Fl_Window::default_icon(&icon);
             break;
         }
     }
@@ -847,11 +812,11 @@ int ex::start(const char *in)
     auto win = new Fl_Double_Window(w, h, "simple mkvextract GUI");
 
     Fl_Menu_Item context_menu[] = {
-        { " Select all",     0, cb::select_all,  NULL, FL_MENU_INACTIVE                   },
-        { " Select none",    0, cb::select_none, NULL, FL_MENU_INACTIVE | FL_MENU_DIVIDER },
-        { " Open file",      0, cb::add                                                   },
-        { " Close program ", 0, cb::close,       win,  FL_MENU_DIVIDER                    },
-        { " Dismiss",        0, cb::null                                                  },
+        { " Select all",     0, cb::select_all,  NULL,    FL_MENU_INACTIVE                   },
+        { " Select none",    0, cb::select_none, NULL,    FL_MENU_INACTIVE | FL_MENU_DIVIDER },
+        { " Open file",      0, cb::add                                                      },
+        { " Close program ", 0, cb::close,       win,     FL_MENU_DIVIDER                    },
+        { " Dismiss",        0, [](Fl_Widget *, void *){}                                    },
         { 0 }
     };
 
@@ -987,10 +952,8 @@ int ex::start(const char *in)
           o->clear_visible_focus();
         } /* fltk::browser */
 
-        { auto o = fltk::dnd_area = new dnd_box(fltk::browser->x(),
-                                                fltk::browser->y(),
-                                                fltk::browser->w(),
-                                                fltk::browser->h());
+        { auto b = fltk::browser;
+          auto o = fltk::dnd_area = new dnd_box(b->x(), b->y(), b->w(), b->h());
           o->callback(cb::dnd);
         } /* fltk::dnd_area */
     }
@@ -1025,7 +988,7 @@ int ex::start(const char *in)
                                                  110,
                                                  but_h,
                                                  "Close");
-              o->callback(cb::close_cmdWin);
+              o->callback( [](Fl_Widget *){fltk::cmdWin->hide();} );
             } /* but_close */
 
             { auto o = but_copy = new Fl_Button(but_close->x() - 150 - 5,
@@ -1068,10 +1031,10 @@ int ex::start(const char *in)
 
     win->show();
 
-    th::lock();
+    thread::lock();
 
     if (!ex::cfg.file.empty()) {
-        th::start_mkvinfo();
+        thread::info.start();
     }
 
     /* uncomment to test rotating animation */
@@ -1081,7 +1044,8 @@ int ex::start(const char *in)
     int rv = Fl::run();
 
     /* cleanup */
-    th::stop();
+    thread::extract.cancel();
+    thread::info.cancel();
 
     if (win) delete win;
     if (fltk::cmdWin) delete fltk::cmdWin;
