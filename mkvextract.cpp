@@ -55,6 +55,7 @@
 #include "check_browser.hpp"
 #include "pipe_command.hpp"
 #include "posix_thread.hpp"
+#include "rotate.hpp"
 #include "mkvextract.hpp"
 
 namespace fs = std::filesystem;
@@ -91,7 +92,6 @@ namespace cb {
     static void cmd(Fl_Widget *, void *);
     static void dnd(Fl_Widget *);
     static void extract(Fl_Widget *);
-    static void rotate(Fl_Widget *);
     static void select_all(Fl_Widget *, void *);
     static void select_none(Fl_Widget *, void *);
     static void update_browser(Fl_Widget *);
@@ -110,6 +110,7 @@ namespace fltk {
     static Fl_Box *outdir_field = NULL;
     static Fl_Box *infile_label = NULL;
     static Fl_Check_Button *use_source_path = NULL;
+    static rotate *spin = NULL;
 }
 
 
@@ -128,32 +129,6 @@ namespace thread {
         Fl::unlock();
         Fl::awake();
     }
-}
-
-
-namespace rotate
-{
-    static const char svg_template[] =
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-        "<svg width=\"1024\" height=\"1024\" version=\"1.1\" viewBox=\"0 0 270.93 270.93\""
-        " xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\">"
-            "<g transform=\"matrix(.82922 0 0 .82922 23.133 1.5165)\" stroke-width=\"0\">"
-                "<rect transform=\"rotate(0)\"   x=\"0\"       y=\"152.81\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-                "<rect transform=\"rotate(45)\"  x=\"74.544\"  y=\"9.7088\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-                "<rect transform=\"rotate(90)\"  x=\"26.067\"  y=\"-144.19\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-                "<rect transform=\"rotate(135)\" x=\"-117.03\" y=\"-218.73\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-                "<rect transform=\"rotate(0)\"   x=\"181.1\"   y=\"152.81\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-                "<rect transform=\"rotate(45)\"  x=\"255.64\"  y=\"9.7088\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-                "<rect transform=\"rotate(90)\"  x=\"207.17\"  y=\"-144.19\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-                "<rect transform=\"rotate(135)\" x=\"64.064\"  y=\"-218.73\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-            "</g>"
-        "</svg>";
-
-    static std::vector<Fl_SVG_Image *> array;
-    static std::vector<Fl_SVG_Image *>::iterator frame;
-    static Fl_Box *box = NULL;
-    static const float speed = 0.1; /* seconds */
-    static Fl_Timeout_Handler handle = [] (void *) { cb::rotate(NULL); };
 }
 
 
@@ -341,22 +316,8 @@ static void restore_main_window()
     fltk::but_extract->label("Extract");
     fltk::but_extract->callback(cb::extract);
 
-    Fl::remove_timeout(rotate::handle);
-    rotate::box->image(NULL);
-
+    fltk::spin->deactivate();
     Fl::redraw();
-}
-
-static void cb::rotate(Fl_Widget *)
-{
-    if (++rotate::frame == rotate::array.end()) {
-        rotate::frame = rotate::array.begin();
-    }
-
-    rotate::box->image(*rotate::frame);
-    rotate::box->parent()->redraw();
-
-    Fl::repeat_timeout(rotate::speed, rotate::handle);
 }
 
 static void cb::dnd(Fl_Widget *)
@@ -443,7 +404,7 @@ static void *thread::run_extraction_command(void *)
 
     fltk::but_extract->label("Abort");
     fltk::but_extract->callback(cb::abort);
-    Fl::add_timeout(rotate::speed, rotate::handle);
+    fltk::spin->activate();
 
     thread::unlock();
 
@@ -733,31 +694,6 @@ static void ex::init(int bt_h)
     /* init fontconfig */
     FcInit();
 
-    /* create rotation symbols */
-    std::vector<const char *> v = {
-        /* color values */
-        "555", "999", "ddd", "000",
-        "000", "000", "000", "000"
-    };
-
-    size_t size = sizeof(rotate::svg_template) + 3*8;
-    std::vector<char> buf(size);
-
-    for (size_t i = 0; i < v.size(); i++) {
-        if (i > 0) {
-            /* rotate/shift color entries */
-            v.insert(v.begin(), v.back());
-            v.pop_back();
-        }
-
-        snprintf(std::data(buf), size, rotate::svg_template,
-            v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]);
-        rotate::array.push_back(new Fl_SVG_Image(NULL, std::data(buf)));
-        rotate::array.back()->resize(bt_h, bt_h);
-    }
-
-    rotate::frame = rotate::array.begin();
-
     /* use mkvextract icon if present */
     const std::array<const char *, 6> paths = {
         "/usr/share/icons/hicolor/256x256/apps/mkvextract.png",
@@ -868,11 +804,12 @@ int ex::start(const char *in)
                 bx1.align(center_align);
                 fltk::progress_box = &bx1;
 
-                /* icon box */
+                /* spin/rotate icon box */
                 x = bt_w + 15;
                 y = fltk::progress_box->y();
                 Fl_Box bx2(x, y, bt_h, bt_h);
-                rotate::box = &bx2;
+                rotate bx2_rotate(&bx2, bt_h);
+                fltk::spin = &bx2_rotate;
 
                 /* dummy */
                 x = fltk::but_cmd->x() - 1;
@@ -959,8 +896,8 @@ int ex::start(const char *in)
             x = fltk::cmdWin->w() - 110 - 15;
             y = dsp.h() + dsp.y() + 6;
             Fl_Button bt6(x, y, 110, bt_h, "Close");
-            auto fn = [] (Fl_Widget *) { fltk::cmdWin->hide(); };
-            bt6.callback(fn);
+            auto fn_close = [] (Fl_Widget *) { fltk::cmdWin->hide(); };
+            bt6.callback(fn_close);
 
             /* "Copy to clipboard" button */
             x = bt6.x() - 150 - 5;
@@ -1000,6 +937,7 @@ int ex::start(const char *in)
     }
 
     win->show();
+    //fltk::spin->activate(); /* test */
 
     thread::lock();
 
@@ -1007,20 +945,12 @@ int ex::start(const char *in)
         thread::info.start();
     }
 
-    /* uncomment to test rotating animation */
-    //Fl::add_timeout(rotate::speed, rotate::handle);
-
     /* run */
     int rv = Fl::run();
 
     /* cleanup */
     thread::extract.cancel();
     thread::info.cancel();
-
-    while (!rotate::array.empty()) {
-        delete rotate::array.back();
-        rotate::array.pop_back();
-    }
 
     return rv;
 }
