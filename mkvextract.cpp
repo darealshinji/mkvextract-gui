@@ -62,7 +62,7 @@ namespace fs = std::filesystem;
 
 /* MKVextract */
 namespace ex {
-    struct config {
+    namespace cfg {
         bool chapters;
         bool extract_chapters;
         size_t track_count;
@@ -73,11 +73,9 @@ namespace ex {
         std::vector<int> timestampIDs;
         std::vector<std::string> outnames;
         std::vector<std::string> args;
-    };
+    }
 
-    struct config cfg;
-
-    static void init(int but_h);
+    static void init(int bt_h);
     int start(const char *in);
 }
 
@@ -155,10 +153,7 @@ namespace rotate
     static std::vector<Fl_SVG_Image *>::iterator frame;
     static Fl_Box *box = NULL;
     static const float speed = 0.1; /* seconds */
-
-    static Fl_Timeout_Handler handle = [] (void *) {
-        cb::rotate(NULL);
-    };
+    static Fl_Timeout_Handler handle = [] (void *) { cb::rotate(NULL); };
 }
 
 
@@ -205,7 +200,7 @@ static std::string quote_filename(const std::string in)
 static bool file_is_matroska(std::string &file)
 {
     FILE *fp;
-    unsigned char bytes[4];
+    uint8_t bytes[4];
 
     if (file.empty() || !(fp = fopen(file.c_str(), "r"))) {
         return false;
@@ -233,7 +228,7 @@ static void *thread::get_mkv_file_info(void *)
     fltk::but_add->deactivate();
     thread::unlock();
 
-    while (!file_is_matroska(ex::cfg.file)) {
+    while (!file_is_matroska(ex::cfg::file)) {
         thread::lock();
 
         fl_message_title("Warning");
@@ -259,7 +254,7 @@ static void *thread::get_mkv_file_info(void *)
         }
     }
 
-    if (!parsemkv(ex::cfg.file, info, error)) {
+    if (!parsemkv(ex::cfg::file, info, error)) {
         thread::lock();
 
         fl_message_title("Error");
@@ -273,41 +268,41 @@ static void *thread::get_mkv_file_info(void *)
     }
 
     /* save input file's dirname */
-    ex::cfg.outdir_source = dir_name(ex::cfg.file);
+    ex::cfg::outdir_source = dir_name(ex::cfg::file);
 
-    if (!ex::cfg.outdir_source.ends_with('/')) {
-        ex::cfg.outdir_source += '/';
+    if (!ex::cfg::outdir_source.ends_with('/')) {
+        ex::cfg::outdir_source += '/';
     }
 
-    ex::cfg.outnames.clear();
-    ex::cfg.track_count = info.tracks.size();
-    ex::cfg.attach_count = info.attachments.size();
-    ex::cfg.timestampIDs = info.timestampIDs;
-    ex::cfg.chapters = info.has_chapters;
+    ex::cfg::outnames.clear();
+    ex::cfg::track_count = info.tracks.size();
+    ex::cfg::attach_count = info.attachments.size();
+    ex::cfg::timestampIDs = info.timestampIDs;
+    ex::cfg::chapters = info.has_chapters;
 
     thread::lock();
     fltk::browser->clear();
     thread::unlock();
 
-    for (size_t i = 0; i < ex::cfg.track_count; i++) {
+    for (size_t i = 0; i < ex::cfg::track_count; i++) {
         thread::lock();
         fltk::browser->add(info.tracks.at(i).info.c_str());
         thread::unlock();
 
-        ex::cfg.outnames.push_back(info.tracks.at(i).filename);
+        ex::cfg::outnames.push_back(info.tracks.at(i).filename);
     }
 
-    for (size_t i = 0; i < ex::cfg.attach_count; i++) {
+    for (size_t i = 0; i < ex::cfg::attach_count; i++) {
         thread::lock();
         fltk::browser->add(info.attachments.at(i).info.c_str());
         thread::unlock();
 
-        ex::cfg.outnames.push_back(info.attachments.at(i).filename);
+        ex::cfg::outnames.push_back(info.attachments.at(i).filename);
     }
 
     thread::lock();
 
-    if (ex::cfg.chapters) {
+    if (ex::cfg::chapters) {
         fltk::browser->add("Chapters (xml + ogm/txt)");
     }
     fltk::browser->add("Video timestamps");
@@ -319,7 +314,7 @@ static void *thread::get_mkv_file_info(void *)
     menu->next()->activate();
 
     /* update widgets */
-    fltk::infile_label->copy_label(ex::cfg.file.c_str());
+    fltk::infile_label->copy_label(ex::cfg::file.c_str());
     fltk::use_source_path->activate();
     fltk::dnd_area->activate();
     fltk::but_add->activate();
@@ -376,11 +371,11 @@ static void cb::dnd(Fl_Widget *)
             /* URI */
             char *copy = strdup(items.c_str());
             fl_decode_uri(copy);
-            ex::cfg.file = copy + 7;
+            ex::cfg::file = copy + 7;
             free(copy);
             thread::info.start();
         } else if (items.starts_with('/')) {
-            ex::cfg.file = items;
+            ex::cfg::file = items;
             thread::info.start();
         }
     }
@@ -394,13 +389,13 @@ static void cb::browse_outdir(Fl_Widget *)
     fc.title("Select output directory");
 
     if (fc.show() == 0 && (ptr = fc.filename()) != NULL && *ptr != 0) {
-        ex::cfg.outdir_manual = ptr;
+        ex::cfg::outdir_manual = ptr;
 
-        if (!ex::cfg.outdir_manual.ends_with('/')) {
-            ex::cfg.outdir_manual += '/';
+        if (!ex::cfg::outdir_manual.ends_with('/')) {
+            ex::cfg::outdir_manual += '/';
         }
 
-        fltk::outdir_field->copy_label(ex::cfg.outdir_manual.c_str());
+        fltk::outdir_field->copy_label(ex::cfg::outdir_manual.c_str());
         fltk::outdir_field->activate();
         fltk::use_source_path->clear();
     }
@@ -415,7 +410,7 @@ static void cb::add(Fl_Widget *, void *)
     fc.filter("*.mkv|*.mk3d|*.mka|*.mks|*.webm");
 
     if (fc.show() == 0 && (ptr = fc.filename()) != NULL && *ptr != 0) {
-        ex::cfg.file = ptr;
+        ex::cfg::file = ptr;
         thread::info.start();
     }
 }
@@ -452,13 +447,13 @@ static void *thread::run_extraction_command(void *)
 
     thread::unlock();
 
-    pipe_command cmd(ex::cfg.args);
+    pipe_command cmd(ex::cfg::args);
     FILE *fp = cmd.pipe_open();
 
     if (!fp) {
         thread::lock();
         fltk::progress_box->label("ERROR");
-        ex::cfg.extract_chapters = false;
+        ex::cfg::extract_chapters = false;
         thread::unlock();
     } else {
         while (getline(&line, &n, fp) != -1) {
@@ -483,11 +478,11 @@ static void *thread::run_extraction_command(void *)
     restore_main_window();
     thread::unlock();
 
-    if (ex::cfg.chapters && ex::cfg.extract_chapters) {
+    if (ex::cfg::chapters && ex::cfg::extract_chapters) {
         if (fltk::use_source_path->value() == true) {
-            base = ex::cfg.outdir_source + file_stem(ex::cfg.file);
+            base = ex::cfg::outdir_source + file_stem(ex::cfg::file);
         } else {
-            base = ex::cfg.outdir_manual + file_stem(ex::cfg.file);
+            base = ex::cfg::outdir_manual + file_stem(ex::cfg::file);
         }
 
         xml = base + " - chapters.xml";
@@ -510,27 +505,27 @@ static std::string create_extraction_command(bool extract)
     std::string command, base, attach_dir;
     size_t timestamps_entry, tags_entry, chapters_entry;
 
-    ex::cfg.extract_chapters = false;
-    ex::cfg.args.clear();
+    ex::cfg::extract_chapters = false;
+    ex::cfg::args.clear();
 
     if (extract) {
-        ex::cfg.args.push_back("mkvextract");
-        ex::cfg.args.push_back(ex::cfg.file);
-        ex::cfg.args.push_back("--ui-language");
-        ex::cfg.args.push_back("en_US");
-        ex::cfg.args.push_back("--gui-mode");
+        ex::cfg::args.push_back("mkvextract");
+        ex::cfg::args.push_back(ex::cfg::file);
+        ex::cfg::args.push_back("--ui-language");
+        ex::cfg::args.push_back("en_US");
+        ex::cfg::args.push_back("--gui-mode");
     } else {
-        command = "mkvextract " + quote_filename(ex::cfg.file);
+        command = "mkvextract " + quote_filename(ex::cfg::file);
     }
 
     if (fltk::use_source_path->value() == true) {
-        base = ex::cfg.outdir_source + file_stem(ex::cfg.file);
+        base = ex::cfg::outdir_source + file_stem(ex::cfg::file);
     } else {
-        base = ex::cfg.outdir_manual + file_stem(ex::cfg.file);
+        base = ex::cfg::outdir_manual + file_stem(ex::cfg::file);
     }
 
     /* tracks */
-    for (size_t i = 0; i < ex::cfg.track_count; i++) {
+    for (size_t i = 0; i < ex::cfg::track_count; i++) {
         if (!fltk::browser->checked(i+1)) {
             continue;
         }
@@ -539,28 +534,28 @@ static std::string create_extraction_command(bool extract)
             has_tracks = true;
 
             if (extract) {
-                ex::cfg.args.push_back("tracks");
+                ex::cfg::args.push_back("tracks");
             } else {
                 command += " tracks";
             }
         }
 
         std::stringstream ss;
-        ss << i << ":" << base << " - " << ex::cfg.outnames.at(i);
+        ss << i << ":" << base << " - " << ex::cfg::outnames.at(i);
 
         if (extract) {
-            ex::cfg.args.push_back(ss.str());
+            ex::cfg::args.push_back(ss.str());
         } else {
             command += " " + quote_filename(ss.str());
         }
     }
 
     /* attachments */
-    if (ex::cfg.attach_count > 0) {
+    if (ex::cfg::attach_count > 0) {
         attach_dir = base + " - Attachments/";
 
-        for (size_t i = 0; i < ex::cfg.attach_count; i++) {
-            if (!fltk::browser->checked(i + ex::cfg.track_count + 1)) {
+        for (size_t i = 0; i < ex::cfg::attach_count; i++) {
+            if (!fltk::browser->checked(i + ex::cfg::track_count + 1)) {
                 continue;
             }
 
@@ -568,28 +563,28 @@ static std::string create_extraction_command(bool extract)
                 has_attach = true;
 
                 if (extract) {
-                    ex::cfg.args.push_back("attachments");
+                    ex::cfg::args.push_back("attachments");
                 } else {
                     command += " attachments";
                 }
             }
 
             std::stringstream ss;
-            ss << i+1 << ":" << attach_dir << ex::cfg.outnames.at(i + ex::cfg.track_count);
+            ss << i+1 << ":" << attach_dir << ex::cfg::outnames.at(i + ex::cfg::track_count);
 
             if (extract) {
-                ex::cfg.args.push_back(ss.str());
+                ex::cfg::args.push_back(ss.str());
             } else {
                 command += " " + quote_filename(ss.str());
             }
         }
     }
 
-    timestamps_entry = ex::cfg.track_count + ex::cfg.attach_count + 1;
+    timestamps_entry = ex::cfg::track_count + ex::cfg::attach_count + 1;
     tags_entry = timestamps_entry + 1;
 
     /* chapters */
-    if (ex::cfg.chapters) {
+    if (ex::cfg::chapters) {
         chapters_entry = timestamps_entry;
         timestamps_entry++;
         tags_entry++;
@@ -598,9 +593,9 @@ static std::string create_extraction_command(bool extract)
             std::string s = base + " - chapters.xml";
 
             if (extract) {
-                ex::cfg.args.push_back("chapters");
-                ex::cfg.args.push_back(s);
-                ex::cfg.extract_chapters = true;
+                ex::cfg::args.push_back("chapters");
+                ex::cfg::args.push_back(s);
+                ex::cfg::extract_chapters = true;
             } else {
                 command += " chapters " + quote_filename(s);
             }
@@ -608,20 +603,20 @@ static std::string create_extraction_command(bool extract)
     }
 
     /* timestamps */
-    if (fltk::browser->checked(timestamps_entry) && ex::cfg.timestampIDs.size() > 0) {
+    if (fltk::browser->checked(timestamps_entry) && ex::cfg::timestampIDs.size() > 0) {
         if (extract) {
-            ex::cfg.args.push_back("timestamps_v2");
+            ex::cfg::args.push_back("timestamps_v2");
         } else {
             command += " timestamps_v2";
         }
 
-        for (size_t i = 0; i < ex::cfg.timestampIDs.size(); i++) {
-            int id = ex::cfg.timestampIDs.at(i);
+        for (size_t i = 0; i < ex::cfg::timestampIDs.size(); i++) {
+            int id = ex::cfg::timestampIDs.at(i);
             std::stringstream ss;
             ss << id << ":" << base << " - track_" << id+1 << "_video_timestamps_v2.txt";
 
             if (extract) {
-                ex::cfg.args.push_back(ss.str());
+                ex::cfg::args.push_back(ss.str());
             } else {
                 command += " " + quote_filename(ss.str());
             }
@@ -633,8 +628,8 @@ static std::string create_extraction_command(bool extract)
         std::string s = base + " - tags.xml";
 
         if (extract) {
-            ex::cfg.args.push_back("tags");
-            ex::cfg.args.push_back(s);
+            ex::cfg::args.push_back("tags");
+            ex::cfg::args.push_back(s);
         } else {
             command += " tags " + quote_filename(s);
         }
@@ -645,9 +640,9 @@ static std::string create_extraction_command(bool extract)
 
 static void cb::clipboard(Fl_Widget *, void *p)
 {
-    auto buff = reinterpret_cast<Fl_Text_Buffer *>(p);
-    char *text = buff->text();
-    Fl::copy(text, buff->length(), 1);
+    auto o = reinterpret_cast<Fl_Text_Buffer *>(p);
+    char *text = o->text();
+    Fl::copy(text, o->length(), 1);
     free(text);
 }
 
@@ -655,16 +650,12 @@ static void cb::cmd(Fl_Widget *, void *p)
 {
     std::string command = create_extraction_command(false);
     reinterpret_cast<Fl_Text_Buffer *>(p)->text(command.c_str());
-
     fltk::cmdWin->show();
 }
 
 static void cb::extract(Fl_Widget *)
 {
-    if (fltk::cmdWin) {
-        fltk::cmdWin->hide();
-    }
-
+    fltk::cmdWin->hide();
     thread::extract.start();
 }
 
@@ -680,10 +671,10 @@ static void cb::abort(Fl_Widget *)
 static void cb::check_outdir(Fl_Widget *)
 {
     if (fltk::use_source_path->value() == true) {
-        fltk::outdir_field->copy_label(ex::cfg.outdir_source.c_str());
+        fltk::outdir_field->copy_label(ex::cfg::outdir_source.c_str());
         fltk::outdir_field->deactivate();
     } else {
-        fltk::outdir_field->copy_label(ex::cfg.outdir_manual.c_str());
+        fltk::outdir_field->copy_label(ex::cfg::outdir_manual.c_str());
         fltk::outdir_field->activate();
     }
 }
@@ -722,19 +713,19 @@ static void cb::select_none(Fl_Widget *, void *)
     cb::update_browser(NULL);
 }
 
-static void ex::init(int but_h)
+static void ex::init(int bt_h)
 {
     /* set destination to current directory */
     char *p = get_current_dir_name();
 
     if (p && *p) {
-        ex::cfg.outdir_manual = p;
+        ex::cfg::outdir_manual = p;
 
-        if (ex::cfg.outdir_manual.back() != '/') {
-            ex::cfg.outdir_manual += '/';
+        if (ex::cfg::outdir_manual.back() != '/') {
+            ex::cfg::outdir_manual += '/';
         }
     } else {
-        ex::cfg.outdir_manual = "/tmp/";
+        ex::cfg::outdir_manual = "/tmp/";
     }
 
     free(p);
@@ -743,12 +734,14 @@ static void ex::init(int but_h)
     FcInit();
 
     /* create rotation symbols */
-    std::vector<const char *> v = { /* color values */
-        "555", "999", "ddd", "000",  "000", "000", "000", "000"
+    std::vector<const char *> v = {
+        /* color values */
+        "555", "999", "ddd", "000",
+        "000", "000", "000", "000"
     };
 
     size_t size = sizeof(rotate::svg_template) + 3*8;
-    auto buf = new char[size];
+    std::vector<char> buf(size);
 
     for (size_t i = 0; i < v.size(); i++) {
         if (i > 0) {
@@ -757,15 +750,13 @@ static void ex::init(int but_h)
             v.pop_back();
         }
 
-        snprintf(buf, size, rotate::svg_template,
+        snprintf(std::data(buf), size, rotate::svg_template,
             v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]);
-        rotate::array.push_back(new Fl_SVG_Image(NULL, buf));
-        rotate::array.back()->resize(but_h, but_h);
+        rotate::array.push_back(new Fl_SVG_Image(NULL, std::data(buf)));
+        rotate::array.back()->resize(bt_h, bt_h);
     }
 
     rotate::frame = rotate::array.begin();
-
-    delete[] buf;
 
     /* use mkvextract icon if present */
     const std::array<const char *, 6> paths = {
@@ -790,12 +781,11 @@ static void ex::init(int but_h)
 
 int ex::start(const char *in)
 {
-    const int w = 800;
-    const int h = 480;
-    const int but_h = 28;
-    const int but_w = 110;
-    const int align_center = FL_ALIGN_CENTER | FL_ALIGN_INSIDE | FL_ALIGN_CLIP;
-    const int align_left = FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_CLIP;
+    const int bt_h = 28;
+    const int bt_w = 110;
+    const int center_align = FL_ALIGN_CENTER | FL_ALIGN_INSIDE | FL_ALIGN_CLIP;
+    const int left_align = FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_CLIP;
+    int x, y, w, h;
 
     auto position_at_center = [] (Fl_Double_Window *o) {
         o->position((Fl::w() - o->decorated_w()) / 2,
@@ -803,13 +793,12 @@ int ex::start(const char *in)
     };
 
     /* init data */
-    ex::init(but_h);
+    ex::init(bt_h);
 
     /* main window */
-    Fl_Box *dummy;
-    Fl_Group *g, *g_top, *g_inside1, *g_inside2;
-    auto buffer = new Fl_Text_Buffer();
-    auto win = new Fl_Double_Window(w, h, "simple mkvextract GUI");
+    Fl_Text_Buffer buffer;
+    Fl_Double_Window win1(800, 480, "simple mkvextract GUI");
+    auto win = &win1;
 
     Fl_Menu_Item context_menu[] = {
         { " Select all",     0, cb::select_all,  NULL,    FL_MENU_INACTIVE                   },
@@ -821,193 +810,175 @@ int ex::start(const char *in)
     };
 
     win->callback(cb::close, win);
-    {
-        g = new Fl_Group(0,
-                         h - but_h*2 - 25,
-                         w,
-                         but_h*2 + 25);
-        {
-            { auto o = fltk::but_extract =
-                new Fl_Button(w - 10 - but_w,
-                              h - 10 - but_h,
-                              but_w,
-                              but_h,
-                              "Extract");
-              o->callback(cb::extract);
-              o->deactivate();
-            } /* fltk::but_extract */
+    win->begin();
 
-            { auto o = fltk::but_cmd =
-                new Fl_Button(fltk::but_extract->x() - 10 - but_w,
-                              fltk::but_extract->y(),
-                              but_w,
-                              but_h,
-                              "Command");
-              o->callback(cb::cmd, buffer);
-              o->deactivate();
-            } /* fltk::but_cmd */
+        /* upper area group */
+        h = bt_h + 5;
+        Fl_Group g_up(0, 0, win->w(), h);
+        g_up.begin();
 
-            g_inside1 = new Fl_Group(0,
-                                     fltk::but_extract->y(),
-                                     w - 30 - 2*but_w,
-                                     but_h);
-            {
-                { auto o = fltk::progress_box =
-                    new Fl_Box(10,
-                               fltk::but_extract->y(),
-                               but_w,
-                               but_h);
-                  o->align(align_center);
-                  o->box(FL_THIN_DOWN_BOX);
-                } /* fltk::progress_box */
+            /* "Open file" button */
+            x = win->w() - 10 - bt_w;
+            Fl_Button bt5(x, 5, bt_w, bt_h, "Open file");
+            bt5.callback(cb::add);
+            fltk::but_add = &bt5;
 
-                rotate::box = new Fl_Box(but_w + 15,
-                                         fltk::progress_box->y(),
-                                         but_h,
-                                         but_h);
+            /* input file label */
+            w = fltk::but_add->x() - 20;
+            Fl_Box bx4(FL_THIN_DOWN_BOX, 11, 5, w, bt_h, "(drag and drop a Matroska file)");
+            bx4.align(left_align);
+            bx4.labelsize(12);
+            fltk::infile_label = &bx4;
 
-                { auto o = dummy = new Fl_Box(fltk::but_cmd->x() - 1,
-                                              fltk::progress_box->y(),
-                                              1,
-                                              1);
-                  o->box(FL_NO_BOX);
-                } /* dummy */
-            }
-            g_inside1->resizable(dummy);
-            g_inside1->end();
+        g_up.end();
+        g_up.resizable(fltk::infile_label);
 
-            g_inside2 = new Fl_Group(0,
-                                     g->y(),
-                                     g_inside1->w(),
-                                     but_h);
-            {
-                { auto o = fltk::outdir_field =
-                    new Fl_Box(10,
-                               fltk::but_extract->y() - but_h - 5,
-                               g_inside2->w() - 10,
-                               but_h,
-                               ex::cfg.outdir_manual.c_str());
-                  o->align(align_left);
-                  o->box(FL_THIN_DOWN_BOX);
-                } /* fltk::outdir_field */
-            }
-            g_inside2->resizable(fltk::outdir_field);
-            g_inside2->end();
+        /* bottom area group */
+        y = win->h() - bt_h*2 - 25;
+        w = win->w();
+        h = bt_h*2 + 25;
+        Fl_Group g_bttm(0, y, w, h);
+        g_bttm.begin();
 
-            { auto o = fltk::use_source_path =
-                new Fl_Check_Button(fltk::but_extract->x(),
-                                    fltk::but_extract->y() - but_h - 5,
-                                    but_w,
-                                    but_h,
-                                    " Source path");
-              o->deactivate();
-              o->callback(cb::check_outdir);
-              o->clear_visible_focus();
-            } /* fltk::use_source_path */
+            /* "Extract" button */
+            x = win->w() - 10 - bt_w;
+            y = win->h() - 10 - bt_h;
+            Fl_Button bt1(x, y, bt_w, bt_h, "Extract");
+            bt1.callback(cb::extract);
+            bt1.deactivate();
+            fltk::but_extract = &bt1;
 
-            { auto o = fltk::but_outdir =
-                new Fl_Button(fltk::but_cmd->x(),
-                              fltk::use_source_path->y(),
-                              but_w,
-                              but_h,
-                              "Destination");
-              o->callback(cb::browse_outdir);
-            } /* fltk::but_outdir */
-        }
-        g->resizable(g_inside2);
-        g->end();
+            /* "Command" button */
+            x = fltk::but_extract->x() - 10 - bt_w;
+            y = fltk::but_extract->y();
+            Fl_Button bt2(x, y, bt_w, bt_h, "Command");
+            bt2.callback(cb::cmd, &buffer);
+            bt2.deactivate();
+            fltk::but_cmd = &bt2;
 
-        g_top = new Fl_Group(0, 0, w, but_h + 5);
-        {
-            { auto o = fltk::but_add =
-                new Fl_Button(w - 10 - but_w,
-                              5,
-                              but_w,
-                              but_h,
-                              "Open file");
-              o->callback(cb::add);
-            } /* fltk::but_add */
+            /* progress area group */
+            y = fltk::but_extract->y();
+            w = win->w() - 30 - 2*bt_w;
+            Fl_Group g_prog(0, y, w, bt_h);
+            g_prog.begin();
 
-            { auto o = fltk::infile_label =
-                new Fl_Box(11,
-                           5,
-                           fltk::but_add->x() - 20,
-                           but_h,
-                           "(drag and drop a Matroska file)");
-              o->align(align_left);
-              o->box(FL_THIN_DOWN_BOX);
-              o->labelsize(12);
-            } /* fltk::infile_label */
-        }
-        g_top->resizable(fltk::infile_label);
-        g_top->end();
+                /* progress box */
+                y = fltk::but_extract->y();
+                Fl_Box bx1(FL_THIN_DOWN_BOX, 10, y, bt_w, bt_h, NULL);
+                bx1.align(center_align);
+                fltk::progress_box = &bx1;
 
-        { auto o = fltk::browser =
-                new check_browser(10,
-                                  fltk::but_add->y() + fltk::but_add->h() + 5,
-                                  w - 20,
-                                  h - but_h*3 - 35);
-          o->menu(context_menu);
-          o->callback(cb::update_browser);
-          o->clear_visible_focus();
-        } /* fltk::browser */
+                /* icon box */
+                x = bt_w + 15;
+                y = fltk::progress_box->y();
+                Fl_Box bx2(x, y, bt_h, bt_h);
+                rotate::box = &bx2;
 
-        { auto o = fltk::dnd_area = new dnd_box(win->x(), win->y(), win->w(), win->h());
-          o->callback(cb::dnd);
-        } /* fltk::dnd_area */
-    }
+                /* dummy */
+                x = fltk::but_cmd->x() - 1;
+                y = fltk::progress_box->y();
+                Fl_Box dummy1(FL_NO_BOX, x, y, 1, 1, NULL);
+
+            g_prog.end();
+            g_prog.resizable(&dummy1);
+
+            /* output directory group */
+            Fl_Group g_outd(0, g_bttm.y(), g_prog.w(), bt_h);
+            g_outd.begin();
+
+                /* output directory label */
+                y = fltk::but_extract->y() - bt_h - 5;
+                w = g_outd.w() - 10;
+                Fl_Box bx3(FL_THIN_DOWN_BOX, 10, y, w, bt_h, ex::cfg::outdir_manual.c_str());
+                bx3.align(left_align);
+                fltk::outdir_field = &bx3;
+
+            g_outd.end();
+            g_outd.resizable(fltk::outdir_field);
+
+            /* "Source path" check button */
+            x = fltk::but_extract->x();
+            y = fltk::but_extract->y() - bt_h - 5;
+            Fl_Check_Button bt3(x, y, bt_w, bt_h, " Source path");
+            bt3.deactivate();
+            bt3.callback(cb::check_outdir);
+            bt3.clear_visible_focus();
+            fltk::use_source_path = &bt3;
+
+            /* "Destination" button */
+            x = fltk::but_cmd->x();
+            y = fltk::use_source_path->y();
+            Fl_Button bt4(x, y, bt_w, bt_h, "Destination");
+            bt4.callback(cb::browse_outdir);
+            fltk::but_outdir = &bt4;
+
+        g_bttm.end();
+        g_bttm.resizable(g_outd);
+
+        /* check browser */
+        y = fltk::but_add->y() + fltk::but_add->h() + 5;
+        w = win->w() - 20;
+        h = win->h() - bt_h*3 - 35;
+        check_browser chk(10, y, w, h);
+        chk.menu(context_menu);
+        chk.callback(cb::update_browser);
+        chk.clear_visible_focus();
+        fltk::browser = &chk;
+
+        /* drag 'n drop area */
+        dnd_box bx5(win->x(), win->y(), win->w(), win->h());
+        bx5.callback(cb::dnd);
+        fltk::dnd_area = &bx5;
+
     win->end();
     win->resizable(fltk::browser);
     win->size_range(512, 384, Fl::w(), Fl::h());
     position_at_center(win);
 
-    /* cmd window */
-    Fl_Text_Display *disp;
-    Fl_Button *but_copy, *but_close;
-    Fl_Box *dummy2;
-    Fl_Group *g_cmd;
 
-    fltk::cmdWin = new Fl_Double_Window(640, 320, "Command line");
-    {
-        { auto o = disp = new Fl_Text_Display(15,
-                                              15,
-                                              fltk::cmdWin->w() - 30,
-                                              fltk::cmdWin->h() - 30 - but_h);
-          o->buffer(buffer);
-          o->wrap_mode(Fl_Text_Display::WRAP_AT_BOUNDS, 2);
-        } /* disp */
+    /* Command line window */
+    Fl_Double_Window win2(640, 320, "Command line");
+    fltk::cmdWin = &win2;
+    fltk::cmdWin->begin();
 
-        g_cmd = new Fl_Group(0,
-                             disp->h() + disp->y(),
-                             fltk::cmdWin->w(),
-                             fltk::cmdWin->h() - disp->h() - disp->y());
-        {
-            { auto o = but_close = new Fl_Button(fltk::cmdWin->w() - 110 - 15,
-                                                 disp->h() + disp->y() + 6,
-                                                 110,
-                                                 but_h,
-                                                 "Close");
-              o->callback( [](Fl_Widget *){fltk::cmdWin->hide();} );
-            } /* but_close */
+        /* text display */
+        w = fltk::cmdWin->w() - 30;
+        h = fltk::cmdWin->h() - 30 - bt_h;
+        Fl_Text_Display dsp(15, 15, w, h);
+        dsp.buffer(&buffer);
+        dsp.wrap_mode(Fl_Text_Display::WRAP_AT_BOUNDS, 2);
 
-            { auto o = but_copy = new Fl_Button(but_close->x() - 150 - 5,
-                                                but_close->y(),
-                                                150,
-                                                but_h,
-                                                "Copy to clipboard");
-              o->callback(cb::clipboard, buffer);
-            } /* but_copy */
+        /* button group */
+        y = dsp.h() + dsp.y();
+        w = fltk::cmdWin->w();
+        h = fltk::cmdWin->h() - dsp.h() - dsp.y();
+        Fl_Group g_bttn(0, y, w, h);
+        g_bttn.begin();
 
-            dummy2 = new Fl_Box(but_copy->x() - 1,
-                                but_copy->y(),
-                                1,
-                                1);
-        }
-        g_cmd->end();
-        g_cmd->resizable(dummy2);
-    }
-    fltk::cmdWin->resizable(disp);
+            /* "Close" button */
+            x = fltk::cmdWin->w() - 110 - 15;
+            y = dsp.h() + dsp.y() + 6;
+            Fl_Button bt6(x, y, 110, bt_h, "Close");
+            auto fn = [] (Fl_Widget *) { fltk::cmdWin->hide(); };
+            bt6.callback(fn);
+
+            /* "Copy to clipboard" button */
+            x = bt6.x() - 150 - 5;
+            Fl_Button bt7(x, bt6.y(), 150, bt_h, "Copy to clipboard");
+            bt7.callback(cb::clipboard, &buffer);
+
+            /* dummy */
+            x = bt7.x() - 1;
+            Fl_Box dummy2(FL_NO_BOX, x, bt7.y(), 1, 1, NULL);
+
+        g_bttn.end();
+        g_bttn.resizable(&dummy2);
+
+    fltk::cmdWin->end();
+    fltk::cmdWin->resizable(&dsp);
+    fltk::cmdWin->size_range(fltk::cmdWin->w(), fltk::cmdWin->h(), Fl::w(), Fl::h());
     position_at_center(fltk::cmdWin);
+
 
     if (in && *in) {
         if (fl_filename_isdir(in)) {
@@ -1020,10 +991,10 @@ int ex::start(const char *in)
             char *p;
 
             if (in[0] != '/' && (p = canonicalize_file_name(in)) != NULL) {
-                ex::cfg.file = p;
+                ex::cfg::file = p;
                 free(p);
             } else {
-                ex::cfg.file = in;
+                ex::cfg::file = in;
             }
         }
     }
@@ -1032,7 +1003,7 @@ int ex::start(const char *in)
 
     thread::lock();
 
-    if (!ex::cfg.file.empty()) {
+    if (!ex::cfg::file.empty()) {
         thread::info.start();
     }
 
@@ -1045,9 +1016,6 @@ int ex::start(const char *in)
     /* cleanup */
     thread::extract.cancel();
     thread::info.cancel();
-
-    if (win) delete win;
-    if (fltk::cmdWin) delete fltk::cmdWin;
 
     while (!rotate::array.empty()) {
         delete rotate::array.back();
