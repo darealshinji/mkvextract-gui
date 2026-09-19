@@ -57,7 +57,7 @@ static struct codec_specs mkv_codec_list[] =
     { "V_MPEG4/MS/V3",        "m4v"    },
     { "V_MS/VFW/FOURCC",      "vcm"    }, /* Microsoft Video Codec Manager (VCM) */
     { "V_QUICKTIME",          "mov"    },
-    { "V_PRORES",             "mov"    },
+    { "V_PRORES",             "mov"    }, /* Apple */
     { "V_REAL/RV10",          "rv"     },
     { "V_REAL/RV20",          "rv"     },
     { "V_REAL/RV30",          "rv"     },
@@ -114,7 +114,7 @@ static struct codec_specs mkv_codec_list[] =
 
     /* subtitles */
     { "S_ARIBSUB",            "es"     }, /* Elementary Stream */
-    { "S_DVBSUB",             "dvbsub" },
+    { "S_DVBSUB",             "dvb"    },
     { "S_HDMV/PGS",           "pgs"    },
     { "S_HDMV/TEXTST",        "textst" },
     { "S_KATE",               "ogx"    }, /* https://wiki.xiph.org/MIME_Types_and_File_Extensions */
@@ -122,12 +122,12 @@ static struct codec_specs mkv_codec_list[] =
     { "S_TEXT/ASS",           "ass"    },
     { "S_TEXT/ASCII",         "txt"    },
     { "S_TEXT/SSA",           "ssa"    },
-    { "S_TEXT/USF",           "usf"    },
+    { "S_TEXT/USF",           "usf"    }, /* XML format */
     { "S_TEXT/UTF8",          "srt"    }, /* SubRip Text */
     { "S_TEXT/WEBVTT",        "vtt"    },
     { "S_VOBSUB",             "sub"    }, /* .idx/.sub */
 
     /* buttons */
-    { "B_VOBBTN",             "vobbtn" }
+    { "B_VOBBTN",             "btn"    }
 };
 
