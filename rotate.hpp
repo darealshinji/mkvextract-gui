@@ -28,105 +28,25 @@
 #include <FL/Fl_Box.H>
 #include <FL/Fl_SVG_Image.H>
 #include <vector>
-#include <stdio.h>
 
 
 class rotate
 {
 private:
 
-    static constexpr const float m_speed = 0.1; /* seconds */
     std::vector<Fl_SVG_Image *> m_array;
     std::vector<Fl_SVG_Image *>::iterator m_frame;
     Fl_Box *m_box;
 
-
-    void next_frame()
-    {
-        if (m_box) {
-            if (++m_frame == m_array.end()) {
-                m_frame = m_array.begin();
-            }
-
-            m_box->image(*m_frame);
-            m_box->parent()->redraw();
-
-            Fl::repeat_timeout(m_speed, cb_next, this);
-        }
-    }
-
-    static void cb_next(void *p) {
-        reinterpret_cast<rotate *>(p)->next_frame();
-    }
-
+    void next_frame();
+    static void cb_next(void *p);
 
 public:
 
-    rotate(Fl_Box *box, int size) : m_box(box)
-    {
-        const char svg_template[] =
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-            "<svg width=\"1024\" height=\"1024\" version=\"1.1\" viewBox=\"0 0 270.93 270.93\""
-            " xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\">"
-                "<g transform=\"matrix(.82922 0 0 .82922 23.133 1.5165)\" stroke-width=\"0\">"
-                    "<rect transform=\"rotate(0)\"   x=\"0\"       y=\"152.81\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-                    "<rect transform=\"rotate(45)\"  x=\"74.544\"  y=\"9.7088\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-                    "<rect transform=\"rotate(90)\"  x=\"26.067\"  y=\"-144.19\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-                    "<rect transform=\"rotate(135)\" x=\"-117.03\" y=\"-218.73\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-                    "<rect transform=\"rotate(0)\"   x=\"181.1\"   y=\"152.81\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-                    "<rect transform=\"rotate(45)\"  x=\"255.64\"  y=\"9.7088\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-                    "<rect transform=\"rotate(90)\"  x=\"207.17\"  y=\"-144.19\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-                    "<rect transform=\"rotate(135)\" x=\"64.064\"  y=\"-218.73\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-                "</g>"
-            "</svg>";
+    rotate(Fl_Box *box, int size);
+    ~rotate();
 
-        /* color values */
-        std::vector<const char *> v = {
-            "555", "999", "ddd", "000",
-            "000", "000", "000", "000"
-        };
-
-        std::vector<char> buf(sizeof(svg_template) + v.size()*3);
-
-        for (size_t i = 0; i < v.size(); i++) {
-            if (i > 0) {
-                /* rotate/shift color entries */
-                v.insert(v.begin(), v.back());
-                v.pop_back();
-            }
-
-            snprintf(std::data(buf), buf.size(), svg_template,
-                v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]);
-            m_array.push_back(new Fl_SVG_Image(NULL, std::data(buf)));
-            m_array.back()->resize(size, size);
-        }
-    }
-
-    ~rotate()
-    {
-        deactivate();
-
-        while (!m_array.empty()) {
-            delete m_array.back();
-            m_array.pop_back();
-        }
-    }
-
-    void activate()
-    {
-        if (m_box) {
-            m_frame = m_array.begin();
-            m_box->image(*m_frame);
-            Fl::add_timeout(m_speed, cb_next, this);
-        }
-    }
-
-    void deactivate()
-    {
-        if (m_box) {
-            Fl::remove_timeout(cb_next);
-            m_box->image(NULL);
-        }
-    }
+    void activate();
+    void deactivate();
 };
 
