@@ -81,15 +81,18 @@ namespace ex {
 }
 
 
+#define CB(fn) reinterpret_cast<void (*)(Fl_Widget*, void*)>(cb::fn)
+
+
 /* callback functions */
 namespace cb {
     static void abort(Fl_Widget *);
     static void add(Fl_Widget *, void *);
     static void browse_outdir(Fl_Widget *);
     static void check_outdir(Fl_Widget *);
-    static void clipboard(Fl_Widget *, void *);
-    static void close(Fl_Widget *, void *);
-    static void cmd(Fl_Widget *, void *);
+    static void clipboard(Fl_Widget *, Fl_Text_Buffer *);
+    static void close(Fl_Widget *, Fl_Double_Window *);
+    static void cmd(Fl_Widget *, Fl_Text_Buffer *);
     static void dnd(Fl_Widget *);
     static void extract(Fl_Widget *);
     static void select_all(Fl_Widget *, void *);
@@ -599,18 +602,17 @@ static std::string create_extraction_command(bool extract)
     return command;
 }
 
-static void cb::clipboard(Fl_Widget *, void *p)
+static void cb::clipboard(Fl_Widget *, Fl_Text_Buffer *buffer)
 {
-    auto o = reinterpret_cast<Fl_Text_Buffer *>(p);
-    char *text = o->text();
-    Fl::copy(text, o->length(), 1);
+    char *text = buffer->text();
+    Fl::copy(text, buffer->length(), 1);
     free(text);
 }
 
-static void cb::cmd(Fl_Widget *, void *p)
+static void cb::cmd(Fl_Widget *, Fl_Text_Buffer *buffer)
 {
     std::string command = create_extraction_command(false);
-    reinterpret_cast<Fl_Text_Buffer *>(p)->text(command.c_str());
+    buffer->text(command.c_str());
     fltk::cmdWin->show();
 }
 
@@ -654,12 +656,12 @@ static void cb::update_browser(Fl_Widget *)
     }
 }
 
-static void cb::close(Fl_Widget *, void *p)
+static void cb::close(Fl_Widget *, Fl_Double_Window *win)
 {
     thread::extract.cancel();
     thread::info.cancel();
     fltk::cmdWin->hide();
-    reinterpret_cast<Fl_Double_Window *>(p)->hide();
+    win->hide();
 }
 
 static void cb::select_all(Fl_Widget *, void *)
@@ -740,12 +742,12 @@ int ex::start(const char *in)
         { " Select all",     0, cb::select_all,  NULL,    FL_MENU_INACTIVE                   },
         { " Select none",    0, cb::select_none, NULL,    FL_MENU_INACTIVE | FL_MENU_DIVIDER },
         { " Open file",      0, cb::add                                                      },
-        { " Close program ", 0, cb::close,       win,     FL_MENU_DIVIDER                    },
+        { " Close program ", 0, CB(close),       win,     FL_MENU_DIVIDER                    },
         { " Dismiss",        0, [](Fl_Widget *, void *){}                                    },
         { 0 }
     };
 
-    win->callback(cb::close, win);
+    win->callback(CB(close), win);
     win->begin();
 
         /* upper area group */
@@ -788,7 +790,7 @@ int ex::start(const char *in)
             x = fltk::but_extract->x() - 10 - bt_w;
             y = fltk::but_extract->y();
             Fl_Button bt2(x, y, bt_w, bt_h, "Command");
-            bt2.callback(cb::cmd, &buffer);
+            bt2.callback(CB(cmd), &buffer);
             bt2.deactivate();
             fltk::but_cmd = &bt2;
 
@@ -902,7 +904,7 @@ int ex::start(const char *in)
             /* "Copy to clipboard" button */
             x = bt6.x() - 150 - 5;
             Fl_Button bt7(x, bt6.y(), 150, bt_h, "Copy to clipboard");
-            bt7.callback(cb::clipboard, &buffer);
+            bt7.callback(CB(clipboard), &buffer);
 
             /* dummy */
             x = bt7.x() - 1;
