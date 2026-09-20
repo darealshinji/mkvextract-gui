@@ -1,11 +1,11 @@
-FLTK_CONFIG := fltk-config
-PKG_CONFIG  := pkg-config
-CXXFLAGS    := -Wall -O2 -std=c++20
-CXXFLAGS    += $(shell $(FLTK_CONFIG) --use-images --cxxflags)
-LDFLAGS     := -Wl,--as-needed -s
-
-LIBS  = $(shell $(FLTK_CONFIG) --ldstaticflags --libs --use-images)
-LIBS += $(shell $(PKG_CONFIG) --libs fontconfig)
+FLTK_CONFIG ?= ./fltk/build/usr/bin/fltk-config
+PKG_CONFIG  ?= pkg-config
+CXXFLAGS    := -Wall -O3 -std=c++20
+CXXFLAGS    += $(shell $(FLTK_CONFIG) --use-images --cxxflags 2>/dev/null)
+LDFLAGS     := -Wl,--as-needed -Wl,--gc-sections -s
+LDFLAGS     += $(shell $(FLTK_CONFIG) --ldstaticflags --use-images 2>/dev/null)
+LIBS        := $(shell $(FLTK_CONFIG) --libs --use-images 2>/dev/null)
+LIBS        += $(shell $(PKG_CONFIG) --libs fontconfig 2>/dev/null)
 
 BIN  = simple-mkvextract-gui
 OBJS = main.o mkvextract.o parsemkv.o pipe_command.o rotate.o xml2ogm.o
@@ -18,6 +18,7 @@ CXXFLAGS += -Itinyxml2
 else
 LIBS += $(TINYXML2_LIBS)
 endif
+
 
 
 all: $(BIN)
