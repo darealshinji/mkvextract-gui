@@ -22,10 +22,9 @@
  SOFTWARE.
 **/
 
-#pragma once
-
 #include <FL/Fl.H>
 #include <FL/Fl_Box.H>
+#include <FL/Fl_Group.H>
 #include <FL/Fl_SVG_Image.H>
 #include <vector>
 #include <stdio.h>
@@ -68,7 +67,7 @@ void rotate::next_frame()
 }
 
 
-static void rotate::cb_next(void *p) {
+void rotate::cb_next(void *p) {
     reinterpret_cast<rotate *>(p)->next_frame();
 }
 

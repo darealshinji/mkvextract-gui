@@ -841,7 +841,7 @@ int ex::start(const char *in)
             Fl_Check_Button bt3(x, y, bt_w, bt_h, " Source path");
             bt3.deactivate();
             bt3.callback(cb::check_outdir);
-            bt3.clear_visible_focus();
+            //bt3.clear_visible_focus();
             fltk::use_source_path = &bt3;
 
             /* "Destination" button */
@@ -861,7 +861,7 @@ int ex::start(const char *in)
         check_browser chk(10, y, w, h);
         chk.menu(context_menu);
         chk.callback(cb::update_browser);
-        chk.clear_visible_focus();
+        //chk.clear_visible_focus();
         fltk::browser = &chk;
 
         /* drag 'n drop area */

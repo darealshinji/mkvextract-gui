@@ -1,3 +1,13 @@
-/fltk/
-/mkvextract-gui
-/test/test.mkv
+/flkt/
+/simple-mkvextract-gui
+*.o
+*.a
+*.so
+*.obj
+*.lib
+*.exe
+*.dll
+*.dylib
+*~
+*.old
+*.bak
