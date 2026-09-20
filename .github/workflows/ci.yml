@@ -1,18 +1,15 @@
 name: CI
-on: [push, pull_request]
+on: [check_run, push, pull_request, workflow_dispatch]
 jobs:
-  meson-build:
-    runs-on: ubuntu-latest
+  build-project:
+    runs-on: ubuntu-26.04
     steps:     
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
+        with:
+          submodules: true
       - name: Install dependencies
-        run: apt install --no-install-recommends libjpeg-dev libpng-dev libfreetype-dev libpango1.0-dev libx11-dev libxft-dev libxext-dev libxinerama-dev libxrender-dev
+        run: sudo apt-get install --no-install-recommends libjpeg-dev libpng-dev libfreetype-dev libpango1.0-dev libx11-dev libxft-dev libxext-dev libxinerama-dev libxrender-dev
       - name: Build
         run: ./build_fltk.sh && make
-      - name: Upload
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
-        uses: actions/upload-artifact@v7
-        name: simple-mkvextract-gui
-        overwrite: true
 
