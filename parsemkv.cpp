@@ -90,16 +90,22 @@ static std::string human_readable_size(std::string &line)
 }
 
 
-static std::string get_fps_value(const std::string &line)
+static inline bool find(const std::string &haystack, char needle, size_t &pos) {
+    return ((pos = haystack.find(needle)) != std::string::npos);
+}
+
+
+static void get_fps_value(std::string &line)
 {
     const char str[] = " frames/fields per second for a video track)";
-    size_t pos = line.find('(');
+    size_t pos;
 
-    if (pos != std::string::npos && line.ends_with(str)) {
-        return line.substr(pos + 1, line.size() - (pos + sizeof(str) + 1));
+    if (find(line, '(', pos) && line.ends_with(str)) {
+        line.erase(line.size() - sizeof(str) - 1);
+        line.erase(0, pos + 1);
+    } else {
+        line = "??";
     }
-
-    return "??";
 }
 
 
@@ -151,7 +157,7 @@ bool parsemkv(std::string &mkv_file, struct mkv_file_info &info, std::string &er
         return false;
     }
 
-    error = "";
+    error.clear();
 
     const std::string
         S_codecid =  "|  + Codec ID: ",
@@ -193,7 +199,8 @@ bool parsemkv(std::string &mkv_file, struct mkv_file_info &info, std::string &er
                 continue;
             }
             else if (check_line(line, S_duration)) {
-                tracks.back().duration = get_fps_value(line);
+                get_fps_value(line);
+                tracks.back().duration = line;
                 continue;
             }
             else if (check_line(line, S_name)) {
