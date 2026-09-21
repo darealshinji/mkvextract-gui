@@ -27,12 +27,31 @@
 
 
 enum {
+    /**
+     * The character is an apostroph which is escaped with a
+     * backslash and not surrounded by any quotation marks.
+     * Example: \'\'\'
+     */
     MODE_APOSTROPH = 0,
+
+    /**
+     * Any printable characters including space but excluding apostroph
+     * are surrounded by single quotation marks (apostrophs).
+     * Example: 'Abc;"* ?\'
+     */
     MODE_PRINTABLE = 1,
+
+    /**
+     * Any other character is replaced by an escape sequence and
+     * surrounded by single quotation marks (apostrophs) that are
+     * preceeded by a dollar sign.
+     * Example: $'\t\r\n\x01\x02'
+     */
     MODE_SHELL_ESC = 2
 };
 
 
+/* convert a byte into a printable escaped hex digit sequence, i.e. \x1B */
 static const char *uchar_to_hex(unsigned char c)
 {
     static char buf[8];
@@ -58,6 +77,7 @@ std::string quote_filename(const std::string &in)
         return "''";
     }
 
+    /* set the initial mode from the first character */
     if (in.front() == '\'') {
         m = MODE_APOSTROPH;
     } else if (isprint(in.front())) {
@@ -71,16 +91,20 @@ std::string quote_filename(const std::string &in)
     for (auto &c : in) {
         if (c == '\'') {
             if (m == MODE_APOSTROPH) {
+                /* escaped apostroph */
                 s += "\\'";
             } else {
+                /* closing single quotation mark and escaped apostroph*/
                 s += "'\\'";
             }
 
             m = MODE_APOSTROPH;
         } else if (isprint(c)) {
             if (m == MODE_APOSTROPH) {
+                /* opening single quotation mark */
                 s += '\'';
             } else if (m == MODE_SHELL_ESC) {
+                /* closing and opening single quotation marks */
                 s += "''";
             }
 
@@ -88,13 +112,17 @@ std::string quote_filename(const std::string &in)
             m = MODE_PRINTABLE;
         } else {
             if (m == MODE_PRINTABLE) {
+                /* closing single quotation mark plus
+                 * begin of escape character sequence */
                 s += "'$'";
             } else if (m == MODE_APOSTROPH) {
+                /* begin of escape character sequence */
                 s += "$'";
             }
 
             switch (c)
             {
+            /* \n\t\r\f\v escape sequences */
             case '\n':
                 s += "\\n";
                 break;
@@ -111,6 +139,7 @@ std::string quote_filename(const std::string &in)
                 s += "\\v";
                 break;
             default:
+                /* use a \xNN hex digit sequence for other characters */
                 s += uchar_to_hex(c);
                 break;
             }
@@ -119,6 +148,7 @@ std::string quote_filename(const std::string &in)
         }
     }
 
+    /* append closing single quotation mark if needed */
     if (m != MODE_APOSTROPH) {
         s += '\'';
     }
