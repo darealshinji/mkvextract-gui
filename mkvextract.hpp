@@ -47,6 +47,8 @@ namespace ex {
     int start(const char *in);
 }
 
+std::string quote_filename(const std::string &in);
+
 FILE *popen_vp(char **argv, pid_t &child_pid);
 FILE *popen_vp(std::vector<std::string> &argv, pid_t &child_pid);
 

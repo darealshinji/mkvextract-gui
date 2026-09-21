@@ -147,34 +147,6 @@ static inline std::string dir_name(const std::string &path) {
 }
 
 
-static std::string quote_filename(const std::string in)
-{
-    std::string str = "'";
-
-    for (auto &c : in) {
-        switch(c)
-        {
-        case '\n':
-            str += "\\n";
-            break;
-        case '\\':
-            str += "\\\\";
-            break;
-        case '\'':
-            str += "'\\''";
-            break;
-        default:
-            str += c;
-            break;
-        }
-    }
-
-    str += "'";
-
-    return str;
-}
-
-
 static bool file_is_matroska(std::string &file)
 {
     FILE *fp;

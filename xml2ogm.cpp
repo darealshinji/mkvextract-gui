@@ -52,7 +52,6 @@ CHAPTER02NAME=Chapter 02
 #include <string.h>
 #include <stdio.h>
 #include <tinyxml2.h>
-#include "mkvextract.hpp"
 
 
 static inline bool empty(const char *str)
