@@ -919,13 +919,6 @@ int ex::start(const char *in)
         thread::info.start();
     }
 
-    /* run */
-    int rv = Fl::run();
-
-    /* cleanup */
-    thread::extract.cancel();
-    thread::info.cancel();
-
-    return rv;
+    return Fl::run();
 }
 
