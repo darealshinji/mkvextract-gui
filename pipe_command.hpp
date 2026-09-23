@@ -45,7 +45,5 @@ public:
 
     FILE *pipe_open();
     void pipe_close();
-
-    bool error();
 };
 

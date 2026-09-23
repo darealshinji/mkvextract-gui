@@ -33,11 +33,12 @@ private:
     pthread_t m_thread;
     bool m_running = false;
     void *(*m_fn)(void *);
+    void *m_data;
 
 public:
 
-    posix_thread(void *(*fn)(void *))
-    : m_fn(fn)
+    posix_thread(void *(*fn)(void *), void *data)
+    : m_fn(fn), m_data(data)
     {}
 
     ~posix_thread() {
@@ -48,7 +49,7 @@ public:
     {
         cancel();
 
-        if (pthread_create(&m_thread, NULL, m_fn, NULL) == 0) {
+        if (pthread_create(&m_thread, NULL, m_fn, m_data) == 0) {
             m_running = true;
         }
     }

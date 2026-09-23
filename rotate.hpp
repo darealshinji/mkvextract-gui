@@ -38,12 +38,12 @@ private:
     std::vector<Fl_SVG_Image *>::iterator m_frame;
     Fl_Box *m_box;
 
-    void next_frame();
     static void cb_next(void *p);
+    void do_next_frame();
 
 public:
 
-    rotate(Fl_Box *box, int size);
+    rotate(Fl_Box *o);
     ~rotate();
 
     void activate();

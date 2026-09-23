@@ -28,9 +28,14 @@
 #include "mkvextract.hpp"
 
 
-static void print_info()
+int main(int argc, char *argv[])
 {
-    /* get and print FLTK version */
+    if (argc > 1 && strcmp(argv[1], "--help") == 0) {
+        std::cout << "usage: " << argv[0] << " [FILE]" << std::endl;
+        return 0;
+    }
+
+    /* print FLTK version */
     const int version = Fl::api_version();
     const int major = version / 10000;
     const int minor = (version % 10000) / 100;
@@ -39,19 +44,9 @@ static void print_info()
     std::cout << "https://github.com/darealshinji/mkvextract-gui\n"
         << "using FLTK " << major << "." << minor << "." << patch << " - https://www.fltk.org/"
         << std::endl;
-}
 
+    MKVextract ex;
+    ex.show(argc > 1 ? argv[1] : NULL);
 
-int main(int argc, char *argv[])
-{
-    if (argc > 1 && strcmp(argv[1], "--help") == 0) {
-        std::cout << "usage: " << argv[0] << " [FILE]" << std::endl;
-        return 0;
-    }
-
-    const char *file = argc > 1 ? argv[1] : NULL;
-
-    print_info();
-
-    return ex::start(file);
+    return Fl::run();
 }

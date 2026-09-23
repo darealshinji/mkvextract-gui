@@ -94,9 +94,3 @@ void pipe_command::pipe_close()
     }
 }
 
-
-bool pipe_command::error()
-{
-    return (m_fp && ferror(m_fp) != 0);
-}
-

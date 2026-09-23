@@ -120,7 +120,7 @@ static inline bool check_line(std::string &line, const std::string str)
 }
 
 
-bool parsemkv(std::string &mkv_file, struct mkv_file_info &info, std::string &error)
+bool MKVextract::parsemkv(std::string &error)
 {
     std::ifstream ifs;
     std::vector<struct track_info> tracks;
@@ -137,7 +137,7 @@ bool parsemkv(std::string &mkv_file, struct mkv_file_info &info, std::string &er
     }
 
     const char *args[] = {
-        "mkvinfo", "--no-bom", "--ui-language", "en_US", mkv_file.c_str(), NULL
+        "mkvinfo", "--no-bom", "--ui-language", "en_US", m_file.c_str(), NULL
     };
 
     pipe_command cmd(const_cast<char **>(args));
@@ -157,7 +157,12 @@ bool parsemkv(std::string &mkv_file, struct mkv_file_info &info, std::string &er
         return false;
     }
 
+    m_outnames.clear();
     error.clear();
+
+    Fl::lock();
+    m_browser->clear();
+    Fl::unlock();
 
     const std::string
         S_codecid =  "|  + Codec ID: ",
@@ -177,7 +182,7 @@ bool parsemkv(std::string &mkv_file, struct mkv_file_info &info, std::string &er
     unsigned short track_entry = tnone;
 
     bool tracks_begin = false;
-    info.has_chapters = false;
+    bool has_chapters = false;
 
     /* parse tracks */
     while (getline(&buf, &n, fp) != -1) {
@@ -285,9 +290,15 @@ bool parsemkv(std::string &mkv_file, struct mkv_file_info &info, std::string &er
             continue;
         }
         else if (line == "|+ Chapters") {
-            info.has_chapters = true;
+            has_chapters = true;
             break;
         }
+    }
+
+    if (ferror(fp) != 0) {
+        error = line;
+        cmd.pipe_close();
+        return false;
     }
 
     for (size_t i = 0; i < tracks.size(); i++) {
@@ -313,7 +324,7 @@ bool parsemkv(std::string &mkv_file, struct mkv_file_info &info, std::string &er
             strm1 << ", " << tracks.at(i).duration << " fps]";
 
             /* for now only extract timestamps of video streams */
-            info.timestampIDs.push_back(i);
+            m_timestampIDs.push_back(i);
         }
         else if (type == "audio") {
             strm1 << " [" << tracks.at(i).channels << ", " << tracks.at(i).freq << "Hz]";
@@ -329,8 +340,11 @@ bool parsemkv(std::string &mkv_file, struct mkv_file_info &info, std::string &er
             }
         }
 
-        struct infos nfo = { strm1.str(), strm2.str() };
-        info.tracks.push_back(nfo);
+        m_outnames.push_back(strm2.str());
+
+        Fl::lock();
+        m_browser->add(strm1.str().c_str());
+        Fl::unlock();
     }
 
     for (size_t i = 0; i < attachments.size(); i++) {
@@ -338,10 +352,40 @@ bool parsemkv(std::string &mkv_file, struct mkv_file_info &info, std::string &er
 
         strm << "Attachment " << i+1 << ": " << attachments.at(i).filename;
         strm << " [" << attachments.at(i).filesize << "]";
+        m_outnames.push_back(strm.str());
 
-        struct infos nfo = { strm.str(), attachments.at(i).filename };
-        info.attachments.push_back(nfo);
+        Fl::lock();
+        m_browser->add(attachments.at(i).filename.c_str());
+        Fl::unlock();
     }
+
+    m_track_count = tracks.size();
+    m_attach_count = attachments.size();
+    m_timestamps_entry = 0;
+    m_chapters_entry = 0;
+    bool has_timestamps = m_timestampIDs.size() > 0;
+
+    /* video timestamps */
+    if (has_timestamps) {
+        Fl::lock();
+        m_browser->add("Video timestamps");
+        Fl::unlock();
+        m_timestamps_entry = m_browser->nitems();
+    }
+
+    /* chapters */
+    if (has_chapters) {
+        Fl::lock();
+        m_browser->add("Chapters (xml + ogm/txt)");
+        Fl::unlock();
+        m_chapters_entry = m_browser->nitems();
+    }
+
+    /* tags */
+    Fl::lock();
+    m_browser->add("Tags");
+    Fl::unlock();
+    m_tags_entry = m_browser->nitems();
 
     return true;
 }

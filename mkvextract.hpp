@@ -24,34 +24,135 @@
 
 #pragma once
 
+#include <FL/Fl.H>
+#include <FL/Fl_Box.H>
+#include <FL/Fl_Button.H>
+#include <FL/Fl_Check_Button.H>
+#include <FL/Fl_Native_File_Chooser.H>
+#include <FL/Fl_Text_Display.H>
+#include <FL/Fl_Double_Window.H>
+
+#include <filesystem>
 #include <string>
 #include <vector>
 #include <stdio.h>
-#include <unistd.h>
+
+#include "dnd.hpp"
+#include "check_browser.hpp"
+#include "posix_thread.hpp"
+#include "rotate.hpp"
 
 
-struct infos {
-    std::string info;
-    std::string filename;
+class MKVextract
+{
+private:
+
+    /* entry order in browser is tracks-->attachments-->timestamps-->chapters-->tags */
+    size_t m_track_count = 0;
+    size_t m_attach_count = 0;
+    size_t m_timestamps_entry = 0;
+    size_t m_chapters_entry = 0;
+    size_t m_tags_entry = 0;
+    std::vector<int> m_timestampIDs;
+    std::vector<std::string> m_outnames;
+
+    std::string m_file;
+    std::string m_outdir_source, m_outdir_manual;
+    std::vector<std::string> m_args;
+
+
+    /* multithreading */
+    posix_thread *m_th_info;
+    posix_thread *m_th_extract;
+
+    static void *thread_run_mkvinfo(void *p);
+    void run_mkvinfo();
+
+    static void *thread_run_mkvextract(void *p);
+    void run_mkvextract();
+
+
+    /* widgets */
+    Fl_Double_Window *m_win;
+    Fl_Double_Window *m_cmd;
+    check_browser *m_browser;
+    dnd_box *m_dnd_area;
+    Fl_Button *m_but_outdir;
+    Fl_Button *m_but_add;
+    Fl_Button *m_but_extract;
+    Fl_Button *m_but_cmd;
+    Fl_Box *m_progress_box;
+    Fl_Box *m_outdir_field;
+    Fl_Box *m_infile_label;
+    Fl_Check_Button *m_use_source_path;
+
+
+    /* other objects */
+    Fl_Native_File_Chooser *m_fcdir;
+    Fl_Native_File_Chooser *m_fcfile;
+    Fl_Text_Buffer *m_txtbuf;
+    rotate *m_rotate;
+
+
+    /* callbacks */
+    static void abort_cb(Fl_Widget *, void *p);
+    static void add_cb(Fl_Widget *, void *p);
+    static void browse_outdir_cb(Fl_Widget *, void *p);
+    static void check_outdir_cb(Fl_Widget *, void *p);
+    static void clipboard_cb(Fl_Widget *, void *p);
+    static void close_cb(Fl_Widget *, void *p);
+    static void close_cmd_cb(Fl_Widget *, void *p);
+    static void cmd_cb(Fl_Widget *, void *p);
+    static void dismiss_cb(Fl_Widget *, void *p);
+    static void dnd_cb(Fl_Widget *, void *p);
+    static void extract_cb(Fl_Widget *, void *p);
+    static void select_all_cb(Fl_Widget *, void *p);
+    static void select_none_cb(Fl_Widget *, void *p);
+    static void update_browser_cb(Fl_Widget *, void *p);
+
+    void do_abort();
+    void do_add();
+    void do_browse_outdir();
+    void do_check_outdir();
+    void do_clipboard();
+    void do_close();
+    //void do_close_cmd();
+    void do_cmd();
+    //void do_dismiss();
+    void do_dnd();
+    void do_extract();
+    void do_select_all();
+    void do_select_none();
+    void do_update_browser();
+
+
+    std::string create_extraction_command(bool extract);
+    void restore_main_window();
+    bool parsemkv(std::string &error);
+
+
+    static inline std::string file_stem(const std::string &path) {
+        return std::filesystem::path(path).stem().string();
+    }
+
+    static inline std::string dir_name(const std::string &path) {
+        return std::filesystem::path(path).parent_path().string();
+    }
+
+
+public:
+
+    MKVextract();
+    ~MKVextract();
+
+    void show(const char *file);
 };
 
-struct mkv_file_info {
-    std::vector<struct infos> tracks;
-    std::vector<struct infos> attachments;
-    std::vector<int> timestampIDs;
-    bool has_chapters;
-};
-
-
-namespace ex {
-    int start(const char *in);
-}
 
 std::string quote_filename(const std::string &in);
 
 FILE *popen_vp(char **argv, pid_t &child_pid);
 FILE *popen_vp(std::vector<std::string> &argv, pid_t &child_pid);
 
-bool parsemkv(std::string &mkv_file, struct mkv_file_info &info, std::string &error);
 bool xml2ogm(const char *input, const char *output);
 

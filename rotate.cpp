@@ -52,27 +52,24 @@ static const char svg_template[] =
     "</svg>";
 
 
-void rotate::next_frame()
-{
-    if (m_box) {
-        if (++m_frame == m_array.end()) {
-            m_frame = m_array.begin();
-        }
-
-        m_box->image(*m_frame);
-        m_box->parent()->redraw();
-
-        Fl::repeat_timeout(TIMEOUT_SPEED, cb_next, this);
-    }
-}
-
-
 void rotate::cb_next(void *p) {
-    reinterpret_cast<rotate *>(p)->next_frame();
+    reinterpret_cast<rotate *>(p)->do_next_frame();
+}
+
+void rotate::do_next_frame()
+{
+    if (++m_frame == m_array.end()) {
+        m_frame = m_array.begin();
+    }
+
+    m_box->image(*m_frame);
+    m_box->parent()->redraw();
+
+    Fl::repeat_timeout(TIMEOUT_SPEED, cb_next, this);
 }
 
 
-rotate::rotate(Fl_Box *box, int size) : m_box(box)
+rotate::rotate(Fl_Box *o) : m_box(o)
 {
     /* color values */
     std::vector<const char *> v = {
@@ -82,6 +79,7 @@ rotate::rotate(Fl_Box *box, int size) : m_box(box)
 
     std::vector<char> buf(sizeof(svg_template) + v.size()*3);
 
+    /* save icons in array */
     for (size_t i = 0; i < v.size(); i++) {
         if (i > 0) {
             /* rotate/shift color entries */
@@ -92,7 +90,7 @@ rotate::rotate(Fl_Box *box, int size) : m_box(box)
         snprintf(std::data(buf), buf.size(), svg_template,
             v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]);
         m_array.push_back(new Fl_SVG_Image(NULL, std::data(buf)));
-        m_array.back()->resize(size, size);
+        m_array.back()->resize(m_box->w(), m_box->h());
     }
 }
 
@@ -110,19 +108,15 @@ rotate::~rotate()
 
 void rotate::activate()
 {
-    if (m_box) {
-        m_frame = m_array.begin();
-        m_box->image(*m_frame);
-        Fl::add_timeout(TIMEOUT_SPEED, cb_next, this);
-    }
+    m_frame = m_array.begin();
+    m_box->image(*m_frame);
+    Fl::add_timeout(TIMEOUT_SPEED, cb_next, this);
 }
 
 
 void rotate::deactivate()
 {
-    if (m_box) {
-        Fl::remove_timeout(cb_next);
-        m_box->image(NULL);
-    }
+    Fl::remove_timeout(cb_next);
+    m_box->image(NULL);
 }
 
