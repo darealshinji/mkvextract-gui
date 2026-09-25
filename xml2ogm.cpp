@@ -60,11 +60,17 @@ static inline bool empty(const char *str)
 }
 
 
-static inline const char *get_text(tinyxml2::XMLElement *elem, const char *label)
+static const char *get_text(tinyxml2::XMLElement *elem, const char *label)
 {
-    auto element = elem->FirstChildElement(label);
+    auto e = elem->FirstChildElement(label);
 
-    return element ? element->GetText() : NULL;
+    if (!e) {
+        return NULL;
+    }
+
+    auto txt = e->GetText();
+
+    return empty(txt) ? NULL : txt;
 }
 
 
@@ -78,7 +84,7 @@ static const char *get_chapter_name(tinyxml2::XMLElement *atom)
     {
         const char *str = get_text(disp, "ChapterString");
 
-        if (empty(str)) {
+        if (!str) {
             continue;
         }
 

@@ -26,33 +26,37 @@
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Group.H>
 #include <FL/Fl_SVG_Image.H>
+#include <string>
 #include <vector>
 #include <stdio.h>
 
 #include "rotate.hpp"
 
-
 #define TIMEOUT_SPEED 0.1 /* seconds */
 
 
-static const char svg_template[] =
-    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-    "<svg width=\"1024\" height=\"1024\" version=\"1.1\" viewBox=\"0 0 270.93 270.93\""
-    " xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\">"
-        "<g transform=\"matrix(.82922 0 0 .82922 23.133 1.5165)\" stroke-width=\"0\">"
-            "<rect transform=\"rotate(0)\"   x=\"0\"       y=\"152.81\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-            "<rect transform=\"rotate(45)\"  x=\"74.544\"  y=\"9.7088\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-            "<rect transform=\"rotate(90)\"  x=\"26.067\"  y=\"-144.19\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-            "<rect transform=\"rotate(135)\" x=\"-117.03\" y=\"-218.73\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-            "<rect transform=\"rotate(0)\"   x=\"181.1\"   y=\"152.81\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-            "<rect transform=\"rotate(45)\"  x=\"255.64\"  y=\"9.7088\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-            "<rect transform=\"rotate(90)\"  x=\"207.17\"  y=\"-144.19\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-            "<rect transform=\"rotate(135)\" x=\"64.064\"  y=\"-218.73\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#%s\" />"
-        "</g>"
-    "</svg>";
+static const char *svg_template =
+  "<svg width=\"1024\" height=\"1024\" version=\"1.1\" viewBox=\"0 0 270.93 270.93\">"
+    "<g transform=\"matrix(.82922 0 0 .82922 23.133 1.5165)\" stroke-width=\"0\">"
+      "<rect transform=\"rotate(0)\"   x=\"0\"       y=\"152.81\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#@@@\" />"
+      "<rect transform=\"rotate(45)\"  x=\"74.544\"  y=\"9.7088\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#@@@\" />"
+      "<rect transform=\"rotate(90)\"  x=\"26.067\"  y=\"-144.19\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#@@@\" />"
+      "<rect transform=\"rotate(135)\" x=\"-117.03\" y=\"-218.73\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#@@@\" />"
+      "<rect transform=\"rotate(0)\"   x=\"181.1\"   y=\"152.81\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#@@@\" />"
+      "<rect transform=\"rotate(45)\"  x=\"255.64\"  y=\"9.7088\"  width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#@@@\" />"
+      "<rect transform=\"rotate(90)\"  x=\"207.17\"  y=\"-144.19\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#@@@\" />"
+      "<rect transform=\"rotate(135)\" x=\"64.064\"  y=\"-218.73\" width=\"89.834\" height=\"17.446\" ry=\"3.8885\" fill=\"#@@@\" />"
+    "</g>"
+  "</svg>";
 
 
-void rotate::cb_next(void *p) {
+template<size_t N>
+bool find_at_pos(const std::string &haystack, char const (&needle)[N], size_t &pos) {
+    return ((pos = haystack.find(needle, pos, N-1)) != std::string::npos);
+}
+
+
+void rotate::next_frame_cb(void *p) {
     reinterpret_cast<rotate *>(p)->do_next_frame();
 }
 
@@ -65,31 +69,35 @@ void rotate::do_next_frame()
     m_box->image(*m_frame);
     m_box->parent()->redraw();
 
-    Fl::repeat_timeout(TIMEOUT_SPEED, cb_next, this);
+    Fl::repeat_timeout(TIMEOUT_SPEED, next_frame_cb, this);
 }
 
 
 rotate::rotate(Fl_Box *o) : m_box(o)
 {
+    std::string copy;
+
     /* color values */
-    std::vector<const char *> v = {
-        "555", "999", "ddd", "000",
-        "000", "000", "000", "000"
-    };
+    const char *col = "59d00000" "59d00000";
+    const char *p = col + 8;   /* ^ here */
 
-    std::vector<char> buf(sizeof(svg_template) + v.size()*3);
+    /* save icons in array; decreasing the pointer "p"
+     * makes the color values shift/rotate to the right */
+    for (size_t i = 0; i < 8; ++i, --p) {
+        size_t pos = 0;
+        copy = svg_template;
 
-    /* save icons in array */
-    for (size_t i = 0; i < v.size(); i++) {
-        if (i > 0) {
-            /* rotate/shift color entries */
-            v.insert(v.begin(), v.back());
-            v.pop_back();
+        /* insert color values */
+        for (size_t j = 0; j < 8; ++j) {
+            if (find_at_pos(copy, "@@@", pos)) {
+                copy.replace(pos, 3, 3, p[j]);
+                //putchar(p[j]);
+            }
         }
 
-        snprintf(std::data(buf), buf.size(), svg_template,
-            v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]);
-        m_array.push_back(new Fl_SVG_Image(NULL, std::data(buf)));
+        //putchar('\n');
+
+        m_array.push_back(new Fl_SVG_Image(NULL, copy.c_str()));
         m_array.back()->resize(m_box->w(), m_box->h());
     }
 }
@@ -110,13 +118,13 @@ void rotate::activate()
 {
     m_frame = m_array.begin();
     m_box->image(*m_frame);
-    Fl::add_timeout(TIMEOUT_SPEED, cb_next, this);
+    Fl::add_timeout(TIMEOUT_SPEED, next_frame_cb, this);
 }
 
 
 void rotate::deactivate()
 {
-    Fl::remove_timeout(cb_next);
+    Fl::remove_timeout(next_frame_cb);
     m_box->image(NULL);
 }
 

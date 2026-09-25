@@ -29,15 +29,18 @@
 /* simple wrapper class for pthread, as an alternative for std::thread */
 class posix_thread
 {
+public:
+    typedef void *(*start_routine_t)(void *);
+
 private:
     pthread_t m_thread;
     bool m_running = false;
-    void *(*m_fn)(void *);
+    start_routine_t m_fn;
     void *m_data;
 
 public:
 
-    posix_thread(void *(*fn)(void *), void *data)
+    posix_thread(start_routine_t fn, void *data = NULL)
     : m_fn(fn), m_data(data)
     {}
 

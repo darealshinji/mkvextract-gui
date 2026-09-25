@@ -55,9 +55,9 @@ static struct codec_specs mkv_codec_list[] =
     { "V_MPEG4/ISO/ASP",      "m4v"    },
     { "V_MPEG4/ISO/SP",       "m4v"    },
     { "V_MPEG4/MS/V3",        "m4v"    },
-    { "V_MS/VFW/FOURCC",      "vcm"    }, /* Microsoft Video Codec Manager (VCM) */
+    { "V_MS/VFW/FOURCC",      "vfw"    }, /* Microsoft Video Codec Manager */
     { "V_QUICKTIME",          "mov"    },
-    { "V_PRORES",             "mov"    }, /* Apple */
+    { "V_PRORES",             "mov"    }, /* Apple ProRes */
     { "V_REAL/RV10",          "rv"     },
     { "V_REAL/RV20",          "rv"     },
     { "V_REAL/RV30",          "rv"     },
@@ -89,11 +89,11 @@ static struct codec_specs mkv_codec_list[] =
     { "A_DTS/LOSSLESS",       "dts"    },
     { "A_EAC3",               "eac3"   },
     { "A_FLAC",               "flac"   },
-    { "A_MLP",                "mlp"    },
-    { "A_MPEG/L1",            "m1a"    },
-    { "A_MPEG/L2",            "m2a"    },
+    { "A_MLP",                "mlp"    }, /* Meridian Lossless Packing */
+    { "A_MPEG/L1",            "mp1"    },
+    { "A_MPEG/L2",            "mp2"    },
     { "A_MPEG/L3",            "mp3"    },
-    { "A_MS/ACM",             "acm"    },
+    { "A_MS/ACM",             "wav"    }, /* Microsoft Audio Codec Manager */
     { "A_REAL/14_4",          "ra"     },
     { "A_REAL/28_8",          "ra"     },
     { "A_REAL/ATRC",          "ra"     },
@@ -101,14 +101,14 @@ static struct codec_specs mkv_codec_list[] =
     { "A_REAL/RALF",          "ra"     },
     { "A_REAL/SIPR",          "ra"     },
     { "A_OPUS",               "opus"   },
-    { "A_PCM/FLOAT/IEEE",     "pcm"    },
-    { "A_PCM/INT/BIG",        "pcm"    },
-    { "A_PCM/INT/LIT",        "pcm"    },
-    { "A_QUICKTIME",          "qta"    },
-    { "A_QUICKTIME/QDMC",     "qdmc"   },
-    { "A_QUICKTIME/QDM2",     "qdm2"   },
+    { "A_PCM/FLOAT/IEEE",     "wav"    },
+    { "A_PCM/INT/BIG",        "wav"    },
+    { "A_PCM/INT/LIT",        "wav"    },
+    { "A_QUICKTIME",          "qt"     },
+    { "A_QUICKTIME/QDMC",     "qt"     },
+    { "A_QUICKTIME/QDM2",     "qt"     },
     { "A_TRUEHD",             "thd"    },
-    { "A_TTA1",               "tta"    },
+    { "A_TTA1",               "tta"    }, /* The True Audio */
     { "A_VORBIS",             "ogg"    },
     { "A_WAVPACK4",           "wv"     },
 

@@ -29,7 +29,7 @@
 #include "mkvextract.hpp"
 
 
-std::string MKVextract::create_extraction_command(bool extract)
+std::string MKVextract::create_cmd(bool extract)
 {
     bool has_tracks = false, has_attach = false;
     std::string command, base, attach_dir;
@@ -68,13 +68,13 @@ std::string MKVextract::create_extraction_command(bool extract)
             }
         }
 
-        std::stringstream ss;
-        ss << i << ":" << base << " - " << m_outnames.at(i);
+        std::stringstream strm;
+        strm << i << ":" << base << " - " << m_outnames.at(i);
 
         if (extract) {
-            m_args.push_back(ss.str());
+            m_args.push_back(strm.str());
         } else {
-            command += " " + quote_filename(ss.str());
+            command += " " + quote_filename(strm.str());
         }
     }
 
@@ -83,7 +83,7 @@ std::string MKVextract::create_extraction_command(bool extract)
         attach_dir = base + " - Attachments/";
 
         for (size_t i = 0; i < m_attach_count; i++) {
-            if (!m_browser->checked(i + m_track_count + 1)) {
+            if (!m_browser->checked(m_track_count + i + 1)) {
                 continue;
             }
 
@@ -97,13 +97,13 @@ std::string MKVextract::create_extraction_command(bool extract)
                 }
             }
 
-            std::stringstream ss;
-            ss << i+1 << ":" << attach_dir << m_outnames.at(i + m_track_count);
+            std::stringstream strm;
+            strm << i+1 << ":" << attach_dir << m_outnames.at(m_track_count + i);
 
             if (extract) {
-                m_args.push_back(ss.str());
+                m_args.push_back(strm.str());
             } else {
-                command += " " + quote_filename(ss.str());
+                command += " " + quote_filename(strm.str());
             }
         }
     }
@@ -118,13 +118,13 @@ std::string MKVextract::create_extraction_command(bool extract)
 
         for (size_t i = 0; i < m_timestampIDs.size(); i++) {
             int id = m_timestampIDs.at(i);
-            std::stringstream ss;
-            ss << id << ":" << base << " - track_" << id+1 << "_video_timestamps_v2.txt";
+            std::stringstream strm;
+            strm << id << ":" << base << " - track " << id+1 << " timestamps.txt";
 
             if (extract) {
-                m_args.push_back(ss.str());
+                m_args.push_back(strm.str());
             } else {
-                command += " " + quote_filename(ss.str());
+                command += " " + quote_filename(strm.str());
             }
         }
     }

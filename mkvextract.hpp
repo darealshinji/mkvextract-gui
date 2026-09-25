@@ -56,8 +56,7 @@ private:
     std::vector<int> m_timestampIDs;
     std::vector<std::string> m_outnames;
 
-    std::string m_file;
-    std::string m_outdir_source, m_outdir_manual;
+    std::string m_file, m_outdir_source, m_outdir_manual;
     std::vector<std::string> m_args;
 
 
@@ -72,9 +71,11 @@ private:
     void run_mkvextract();
 
 
-    /* widgets */
+    /* windows */
     Fl_Double_Window *m_win;
     Fl_Double_Window *m_cmd;
+
+    /* widgets */
     check_browser *m_browser;
     dnd_box *m_dnd_area;
     Fl_Button *m_but_outdir;
@@ -85,7 +86,6 @@ private:
     Fl_Box *m_outdir_field;
     Fl_Box *m_infile_label;
     Fl_Check_Button *m_use_source_path;
-
 
     /* other objects */
     Fl_Native_File_Chooser *m_fcdir;
@@ -126,7 +126,7 @@ private:
     void do_update_browser();
 
 
-    std::string create_extraction_command(bool extract);
+    std::string create_cmd(bool extract);
     void restore_main_window();
     bool parsemkv(std::string &error);
 
@@ -135,8 +135,11 @@ private:
         return std::filesystem::path(path).stem().string();
     }
 
-    static inline std::string dir_name(const std::string &path) {
-        return std::filesystem::path(path).parent_path().string();
+    static inline std::string dir_name(const std::string &path)
+    {
+        auto str = std::filesystem::path(path).parent_path().string();
+        if (!str.ends_with('/')) { str += '/'; }
+        return str;
     }
 
 
@@ -149,10 +152,30 @@ public:
 };
 
 
+/* very simple auto_ptr-like class */
+template<typename T>
+class auto_free
+{
+private:
+    T m_ptr;
+
+public:
+    auto_free(T ptr) : m_ptr(ptr)
+    {}
+
+    ~auto_free()
+    {
+        //puts(__PRETTY_FUNCTION__);
+        free(m_ptr);
+    }
+};
+
+
+/* quote_filename.cpp */
 std::string quote_filename(const std::string &in);
+void fold_text(std::string &text);
 
-FILE *popen_vp(char **argv, pid_t &child_pid);
-FILE *popen_vp(std::vector<std::string> &argv, pid_t &child_pid);
 
+/* xml2ogm.cpp */
 bool xml2ogm(const char *input, const char *output);
 

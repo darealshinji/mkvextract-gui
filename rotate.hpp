@@ -38,7 +38,7 @@ private:
     std::vector<Fl_SVG_Image *>::iterator m_frame;
     Fl_Box *m_box;
 
-    static void cb_next(void *p);
+    static void next_frame_cb(void *p);
     void do_next_frame();
 
 public:

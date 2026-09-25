@@ -67,6 +67,20 @@ static const char *uchar_to_hex(unsigned char c)
 }
 
 
+/* fold text before using it on fl_message() */
+void fold_text(std::string &text)
+{
+    size_t i, cnt;
+
+    for (i=0, cnt=1; i < text.size(); ++i, ++cnt) {
+        if (isspace(text[i]) && cnt >= 80) {
+            text[i] = '\n';
+            cnt = 0;
+        }
+    }
+}
+
+
 /* quote filenames in a shell compatible way */
 std::string quote_filename(const std::string &in)
 {
@@ -102,7 +116,7 @@ std::string quote_filename(const std::string &in)
         } else if (isprint(c)) {
             if (m == MODE_APOSTROPH) {
                 /* opening single quotation mark */
-                s += '\'';
+                s += "'";
             } else if (m == MODE_SHELL_ESC) {
                 /* closing and opening single quotation marks */
                 s += "''";
@@ -150,7 +164,7 @@ std::string quote_filename(const std::string &in)
 
     /* append closing single quotation mark if needed */
     if (m != MODE_APOSTROPH) {
-        s += '\'';
+        s += "'";
     }
 
     return s;

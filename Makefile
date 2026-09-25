@@ -1,5 +1,16 @@
 BIN  = simple-mkvextract-gui
-OBJS = create_extraction_command.o main.o mkvextract.o parsemkv.o pipe_command.o quote_filename.o rotate.o xml2ogm.o
+
+OBJS = \
+	create_cmd.o \
+	main.o \
+	mkvextract.o \
+	pipe_command.o \
+	quote_filename.o \
+	rotate.o \
+	thread_mkvinfo.o \
+	thread_mkvextract.o \
+	xml2ogm.o \
+	$(NULL)
 
 PKG_CONFIG ?= pkg-config
 CXXFLAGS   ?= -Wall -O3 -std=gnu++20
@@ -28,7 +39,6 @@ endif
 LIBS += $(shell $(PKG_CONFIG) --libs fontconfig 2>/dev/null)
 
 
-
 all: $(BIN)
 
 clean:
@@ -39,13 +49,4 @@ distclean: clean
 
 $(BIN): $(OBJS)
 	$(CXX) -o $@ $^ $(LDFLAGS) $(LIBS)
-
-
-create_extraction_command.cpp: mkvextract.hpp check_browser.hpp
-main.cpp: mkvextract.hpp
-mkvextract.cpp: mkvextract.hpp dnd.hpp check_browser.hpp pipe_command.hpp rotate.hpp
-parsemkv.cpp: mkvextract.hpp pipe_command.hpp codecs.h
-pipe_command.cpp: pipe_command.hpp
-rotate.cpp: rotate.hpp
-tinyxml2/tinyxml2.cpp: tinyxml2/tinyxml2.h
 

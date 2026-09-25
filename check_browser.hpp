@@ -31,7 +31,7 @@
 
 class check_browser : public Fl_Check_Browser
 {
-    Fl_Menu_Item *m_menu;
+    Fl_Menu_Item *m_menu = NULL;
 
 public:
     check_browser(int X, int Y, int W, int H, const char *L=NULL)

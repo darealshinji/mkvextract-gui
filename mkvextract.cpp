@@ -58,6 +58,7 @@
 #include "mkvextract.hpp"
 
 
+
 static inline void position_at_center(Fl_Double_Window *o)
 {
     o->position((Fl::w() - o->decorated_w()) / 2,
@@ -65,219 +66,16 @@ static inline void position_at_center(Fl_Double_Window *o)
 }
 
 
-static bool file_is_matroska(std::string &file)
-{
-    FILE *fp;
-    uint8_t bytes[4];
-
-    if (file.empty() || !(fp = fopen(file.c_str(), "r"))) {
-        return false;
-    }
-
-    if (fread(bytes, 1, sizeof(bytes), fp) < sizeof(bytes)) {
-        fclose(fp);
-        return false;
-    }
-
-    fclose(fp);
-
-    return (memcmp(bytes, "\x1A\x45\xDF\xA3", 4) == 0);
-}
-
-
-/* multithreading */
-
-void *MKVextract::thread_run_mkvinfo(void *p)
-{
-    reinterpret_cast<MKVextract *>(p)->run_mkvinfo();
-    return NULL;
-}
-
-void MKVextract::run_mkvinfo()
-{
-    std::string error;
-
-    Fl::lock();
-    m_dnd_area->deactivate();
-    m_but_add->deactivate();
-    Fl::unlock();
-
-    while (!file_is_matroska(m_file)) {
-        Fl::lock();
-
-        fl_message_title("Warning");
-
-        int rv = fl_choice(
-            "The selected file is not of type Matroska or WebM.\n"
-            "Do you want to continue anyway?",
-            "   Stop   ", "Continue", "Try again");
-
-        Fl::unlock();
-        Fl::awake();
-
-        if (rv == 0) {
-            /* stop */
-            Fl::lock();
-            m_dnd_area->activate();
-            m_but_add->activate();
-            Fl::unlock();
-
-            return;
-        } else if (rv == 1) {
-            /* continue anyway */
-            break;
-        }
-    }
-
-    /* parsemkv() invokes mkvinfo */
-    if (!parsemkv(error)) {
-        Fl::lock();
-
-        fl_message_title("Error");
-        fl_message("%s", error.c_str());
-        m_dnd_area->activate();
-        m_but_add->activate();
-
-        Fl::unlock();
-        Fl::awake();
-        return;
-    }
-
-    /* save input file's dirname */
-    m_outdir_source = dir_name(m_file);
-
-    if (!m_outdir_source.ends_with('/')) {
-        m_outdir_source += '/';
-    }
-
-    Fl::lock();
-
-    /* activate "Select ..." menu entries */
-    auto menu = m_browser->menu();
-    menu->activate();
-    menu->next()->activate();
-
-    /* update widgets */
-    m_infile_label->copy_label(m_file.c_str());
-    m_infile_label->activate();
-    m_use_source_path->activate();
-    m_dnd_area->activate();
-    m_but_add->activate();
-    m_but_extract->deactivate();
-    m_but_cmd->deactivate();
-    m_progress_box->label(NULL);
-    do_check_outdir();
-
-    Fl::unlock();
-    Fl::awake();
-
-    Fl::redraw();
-}
-
-
-void *MKVextract::thread_run_mkvextract(void *p)
-{
-    reinterpret_cast<MKVextract *>(p)->run_mkvextract();
-    return NULL;
-}
-
-void MKVextract::run_mkvextract()
-{
-    std::string base, xml, ogm;
-    char *line = NULL;
-    size_t n = 0;
-
-    const char keyword[] = "#GUI#progress ";
-    const size_t keyword_len = sizeof(keyword)-1;
-
-    if (system("mkvextract --version 2>/dev/null >/dev/null") != 0) {
-        Fl::lock();
-        fl_message_title("Error");
-        fl_message("%s", "mkvextract doesn't seem to be in PATH!");
-        Fl::unlock();
-        Fl::awake();
-        return;
-    }
-
-    create_extraction_command(true);
-
-    Fl::lock();
-
-    m_dnd_area->deactivate();
-    m_use_source_path->deactivate();
-    m_but_outdir->deactivate();
-    m_but_add->deactivate();
-
-    m_but_extract->label("Abort");
-    m_but_extract->callback(abort_cb, this);
-    m_rotate->activate();
-
-    Fl::unlock();
-
-    pipe_command cmd(m_args);
-    FILE *fp = cmd.pipe_open();
-
-    if (!fp) {
-        Fl::lock();
-        m_progress_box->label("ERROR");
-        restore_main_window();
-        Fl::unlock();
-        Fl::awake();
-        return;
-    }
-
-    while (getline(&line, &n, fp) != -1) {
-        if (line && strncmp(line, keyword, keyword_len) == 0) {
-            /* trailing newline is ignored by label() */
-            Fl::lock();
-            m_progress_box->copy_label(line + keyword_len);
-            Fl::unlock();
-        }
-    }
-
-    bool has_error = ferror(fp) != 0;
-    cmd.pipe_close();
-    free(line);
-
-    Fl::lock();
-    m_progress_box->label(has_error ? "ERROR" : "DONE");
-    restore_main_window();
-    Fl::unlock();
-
-    if (m_chapters_entry != 0 && m_browser->checked(m_chapters_entry)) {
-        if (m_use_source_path->value() == true) {
-            base = m_outdir_source + file_stem(m_file);
-        } else {
-            base = m_outdir_manual + file_stem(m_file);
-        }
-
-        xml = base + " - chapters.xml";
-        ogm = base + " - chapters.txt";
-
-        if (!xml2ogm(xml.c_str(), ogm.c_str())) {
-            Fl::lock();
-            fl_message_title("Error");
-            fl_message("%s", "Could not create OGM format chapters from XML!");
-            Fl::unlock();
-            Fl::awake();
-        }
-    }
-}
-
-
 void MKVextract::restore_main_window()
 {
-    m_dnd_area->activate();
-    m_use_source_path->activate();
     m_but_outdir->activate();
     m_but_add->activate();
-
     m_but_extract->label("Extract");
     m_but_extract->callback(extract_cb, this);
 
+    m_dnd_area->activate();
+    m_use_source_path->activate();
     m_rotate->deactivate();
-
-    Fl::redraw();
 }
 
 
@@ -343,7 +141,7 @@ void MKVextract::do_add()
     const char *p;
 
     m_fcfile->title("Select a file");
-    m_fcfile->filter("*.mkv|*.mk3d|*.mka|*.mks|*.webm");
+    m_fcfile->filter("*.mkv|*.mka|*.mks|*.mk3d|*.webm"); /* https://www.matroska.org */
 
     if (m_fcfile->show() == 0 && (p = m_fcfile->filename()) != NULL && *p != 0) {
         m_file = p;
@@ -370,7 +168,7 @@ void MKVextract::cmd_cb(Fl_Widget *, void *p) {
 
 void MKVextract::do_cmd()
 {
-    std::string command = create_extraction_command(false);
+    std::string command = create_cmd(false);
     m_txtbuf->text(command.c_str());
     m_cmd->show();
 }
@@ -383,7 +181,7 @@ void MKVextract::extract_cb(Fl_Widget *, void *p) {
 void MKVextract::do_extract()
 {
     m_cmd->hide();
-    Fl::redraw();
+    m_win->redraw();
     m_th_extract->start();
 }
 
@@ -527,6 +325,17 @@ MKVextract::MKVextract()
     }
 
 
+    static Fl_Menu_Item menu[] = {
+        /* text, shortcut, callback, user data, label type */
+        { " Select all",     0, select_all_cb,  this, FL_MENU_INACTIVE                   },
+        { " Select none",    0, select_none_cb, this, FL_MENU_INACTIVE | FL_MENU_DIVIDER },
+        { " Open file",      0, add_cb,         this                                     },
+        { " Close program ", 0, close_cb,       this, FL_MENU_DIVIDER                    },
+        { " Dismiss",        0, dismiss_cb,     NULL                                     },
+        { 0 }
+    };
+
+
     /* main window */
     m_win = new Fl_Double_Window(800, 480, "simple mkvextract GUI");
     m_win->callback(close_cb, this);
@@ -630,9 +439,10 @@ MKVextract::MKVextract()
         h = m_win->h() - bt_h*3 - 35;
         m_browser = new check_browser(10, y, w, h);
         m_browser->callback(update_browser_cb, this);
+        m_browser->menu(menu);
 
         /* drag 'n drop area */
-        m_dnd_area = new dnd_box(m_win->x(), m_win->y(), m_win->w(), m_win->h());
+        m_dnd_area = new dnd_box(0, 0, m_win->w(), m_win->h());
         m_dnd_area->callback(dnd_cb, this);
 
     m_win->end();
@@ -683,20 +493,6 @@ MKVextract::MKVextract()
     position_at_center(m_cmd);
 
 
-    /* set main window's context menu */
-    static Fl_Menu_Item menu[] = {
-        /* text, shortcut, callback, user data, label type */
-        { " Select all",     0, select_all_cb,  this, FL_MENU_INACTIVE                   },
-        { " Select none",    0, select_none_cb, this, FL_MENU_INACTIVE | FL_MENU_DIVIDER },
-        { " Open file",      0, add_cb,         this                                     },
-        { " Close program ", 0, close_cb,       this, FL_MENU_DIVIDER                    },
-        { " Dismiss",        0, dismiss_cb,     this                                     },
-        { 0 }
-    };
-
-    m_browser->menu(menu);
-
-
     /* file choosers */
     m_fcdir = new Fl_Native_File_Chooser(Fl_Native_File_Chooser::BROWSE_DIRECTORY);
     m_fcfile = new Fl_Native_File_Chooser(Fl_Native_File_Chooser::BROWSE_FILE);
@@ -731,7 +527,9 @@ void MKVextract::show(const char *file)
     }
 
     m_win->show();
-    //m_rotate->activate(); /* test */
+
+    /* test timeout handler */
+    //m_rotate->activate();
 
     if (file && *file) {
         if (fl_filename_isdir(file)) {
@@ -741,14 +539,7 @@ void MKVextract::show(const char *file)
             fl_message_title("Error");
             fl_message("cannot read file `%s'", file);
         } else {
-            char *p;
-
-            if (file[0] != '/' && (p = canonicalize_file_name(file)) != NULL) {
-                m_file = p;
-                free(p);
-            } else {
-                m_file = file;
-            }
+            m_file = fl_filename_absolute_str(file);
         }
     }
 

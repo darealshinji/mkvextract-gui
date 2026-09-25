@@ -31,8 +31,8 @@
 class dnd_box : public Fl_Box
 {
 public:
-    dnd_box(int X, int Y, int W, int H, const char *L=NULL)
-    : Fl_Box(X, Y, W, H, L)
+    dnd_box(int X, int Y, int W, int H)
+    : Fl_Box(X, Y, W, H)
     {}
 
     ~dnd_box()
