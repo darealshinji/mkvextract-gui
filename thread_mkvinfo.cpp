@@ -139,8 +139,7 @@ void MKVextract::run_mkvinfo()
     Fl::unlock();
     Fl::awake();
 
-    /* parsemkv() invokes mkvinfo */
-    if (!parsemkv(error)) {
+    if (!parse_mkvinfo(error)) {
         fold_text(error);
 
         Fl::lock();
@@ -183,34 +182,30 @@ void MKVextract::run_mkvinfo()
 
 
 /* read output of mkvinfo */
-bool MKVextract::parsemkv(std::string &error)
+bool MKVextract::parse_mkvinfo(std::string &error)
 {
     std::ifstream ifs;
     std::vector<struct track_info> tracks;
     std::vector<struct attachment_info> attachments;
-    std::string line;
-    size_t n = 0;
-
-    char *buf = NULL;
-    auto_free af(buf);
 
     error.clear();
 
-    /* run mkvinfo */
-
-    if (Fl::system("mkvinfo --version 2>/dev/null >/dev/null") != 0) {
+    if (!command_in_path("mkvinfo")) {
         error = "mkvinfo doesn't seem to be in PATH!";
         return false;
     }
 
     const char *args[] = {
-        "mkvinfo", "--no-bom",
+        "mkvinfo",
+        "--no-bom",
         "--ui-language", "en_US",
         //"--gui-mode",
         //"--abort-on-warnings",
-        m_file.c_str(), NULL
+        m_file.c_str(),
+        NULL
     };
 
+    /* run mkvinfo */
     pipe_command cmd(const_cast<char **>(args));
     FILE *fp = cmd.pipe_open();
 
@@ -237,8 +232,14 @@ bool MKVextract::parsemkv(std::string &error)
     unsigned short track_entry = tnone;
     bool has_chapters = false;
 
+    std::string line;
+    ssize_t nread;
+    size_t n = 0;
+    char *buf = NULL;
+    auto_free af(buf);
+
     /* find begin of tracks info */
-    while (getline(&buf, &n, fp) != -1) {
+    while ((nread = getline(&buf, &n, fp)) != -1) {
         if (strcmp(buf, "|+ Tracks\n") == 0) {
             break;
         } else if (buf[0] != '+' && buf[0] != '|') {
@@ -247,8 +248,13 @@ bool MKVextract::parsemkv(std::string &error)
         }
     }
 
+    if (nread == -1) {
+        error = "no tracks found";
+        return false;
+    }
+
     /* parse tracks */
-    while (getline(&buf, &n, fp) != -1) {
+    while ((nread = getline(&buf, &n, fp)) != -1) {
         if (buf[0] != '+' && buf[0] != '|') {
             error = buf;
             return false;
@@ -332,34 +338,36 @@ bool MKVextract::parsemkv(std::string &error)
     }
 
     /* parse attachments and chapters */
-    while (getline(&buf, &n, fp) != -1) {
-        if (buf[0] != '+' && buf[0] != '|') {
-            error = buf;
-            return false;
-        }
+    if (nread != -1) {
+        while (getline(&buf, &n, fp) != -1) {
+            if (buf[0] != '+' && buf[0] != '|') {
+                error = buf;
+                return false;
+            }
 
-        line = buf;
+            line = buf;
 
-        if (line.ends_with('\n')) {
-            line.pop_back();
-        }
+            if (line.ends_with('\n')) {
+                line.pop_back();
+            }
 
-        if (line == "| + Attached") {
-            struct attachment_info info;
-            attachments.push_back(info);
-            continue;
-        }
-        else if (check_line(line, S_filename)) {
-            attachments.back().filename = line;
-            continue;
-        }
-        else if (check_line(line, S_filesize)) {
-            attachments.back().filesize = human_readable_size(line);
-            continue;
-        }
-        else if (line == "|+ Chapters") {
-            has_chapters = true;
-            break;
+            if (line == "| + Attached") {
+                struct attachment_info info;
+                attachments.push_back(info);
+                continue;
+            }
+            else if (check_line(line, S_filename)) {
+                attachments.back().filename = line;
+                continue;
+            }
+            else if (check_line(line, S_filesize)) {
+                attachments.back().filesize = human_readable_size(line);
+                continue;
+            }
+            else if (line == "|+ Chapters") {
+                has_chapters = true;
+                break;
+            }
         }
     }
 

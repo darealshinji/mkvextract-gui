@@ -48,12 +48,8 @@ void *MKVextract::thread_run_mkvextract(void *p)
 void MKVextract::run_mkvextract()
 {
     std::string base, xml, ogm;
-    size_t n = 0;
 
-    char *buf = NULL;
-    auto_free af(buf);
-
-    if (Fl::system("mkvextract --version 2>/dev/null >/dev/null") != 0) {
+    if (!command_in_path("mkvextract")) {
         Fl::lock();
 
         fl_message_title("Error");
@@ -92,6 +88,10 @@ void MKVextract::run_mkvextract()
         Fl::awake();
         return;
     }
+
+    size_t n = 0;
+    char *buf = NULL;
+    auto_free af(buf);
 
     while (getline(&buf, &n, fp) != -1) {
         if (strncmp(buf, "#GUI#progress ", 14) == 0) {

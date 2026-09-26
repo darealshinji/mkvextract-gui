@@ -40,7 +40,7 @@ private:
 public:
 
     pipe_command(char **argv);
-    pipe_command(std::vector<std::string> &argv);
+    pipe_command(const std::vector<std::string> &argv);
     ~pipe_command();
 
     FILE *pipe_open();

@@ -37,7 +37,7 @@ pipe_command::pipe_command(char **argv)
 {}
 
 
-pipe_command::pipe_command(std::vector<std::string> &argv)
+pipe_command::pipe_command(const std::vector<std::string> &argv)
 {
     for (auto &e : argv) {
         m_vec.push_back(const_cast<char *>(e.c_str()));

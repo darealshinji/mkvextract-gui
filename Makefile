@@ -3,6 +3,7 @@ BIN  = simple-mkvextract-gui
 OBJS = \
 	create_cmd.o \
 	main.o \
+	misc.o \
 	mkvextract.o \
 	pipe_command.o \
 	quote_filename.o \

@@ -66,6 +66,7 @@ private:
 
     static void *thread_run_mkvinfo(void *p);
     void run_mkvinfo();
+    bool parse_mkvinfo(std::string &error);
 
     static void *thread_run_mkvextract(void *p);
     void run_mkvextract();
@@ -128,19 +129,6 @@ private:
 
     std::string create_cmd(bool extract);
     void restore_main_window();
-    bool parsemkv(std::string &error);
-
-
-    static inline std::string file_stem(const std::string &path) {
-        return std::filesystem::path(path).stem().string();
-    }
-
-    static inline std::string dir_name(const std::string &path)
-    {
-        auto str = std::filesystem::path(path).parent_path().string();
-        if (!str.ends_with('/')) { str += '/'; }
-        return str;
-    }
 
 
 public:
@@ -171,11 +159,22 @@ public:
 };
 
 
-/* quote_filename.cpp */
+static inline std::string file_stem(const std::string &path)
+{
+    return std::filesystem::path(path).stem().string();
+}
+
+
+static inline std::string dir_name(const std::string &path)
+{
+    auto str = std::filesystem::path(path).parent_path().string();
+    if (!str.ends_with('/')) { str += '/'; }
+    return str;
+}
+
+
 std::string quote_filename(const std::string &in);
 void fold_text(std::string &text);
-
-
-/* xml2ogm.cpp */
+bool command_in_path(const char *command);
 bool xml2ogm(const char *input, const char *output);
 

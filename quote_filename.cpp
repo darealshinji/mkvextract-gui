@@ -67,20 +67,6 @@ static const char *uchar_to_hex(unsigned char c)
 }
 
 
-/* fold text before using it on fl_message() */
-void fold_text(std::string &text)
-{
-    size_t i, cnt;
-
-    for (i=0, cnt=1; i < text.size(); ++i, ++cnt) {
-        if (isspace(text[i]) && cnt >= 80) {
-            text[i] = '\n';
-            cnt = 0;
-        }
-    }
-}
-
-
 /* quote filenames in a shell compatible way */
 std::string quote_filename(const std::string &in)
 {
