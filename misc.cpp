@@ -35,12 +35,17 @@ namespace fs = std::filesystem;
 /* fold text before using it on fl_message() */
 void fold_text(std::string &text)
 {
-    size_t i, cnt;
+    const unsigned max = 80;
+    size_t n = 0;
 
-    for (i=0, cnt=1; i < text.size(); ++i, ++cnt) {
-        if (isspace(text[i]) && cnt >= 80) {
-            text[i] = '\n';
-            cnt = 0;
+    if (text.size() <= max) {
+        return;
+    }
+
+    for (auto &c : text) {
+        if (++n >= max && isspace(c)) {
+            c = '\n';
+            n = 0;
         }
     }
 }
@@ -69,34 +74,26 @@ bool command_in_path(const char *command)
         return false;
     }
 
-    std::vector<std::string> list;
+    std::vector<fs::path> list;
     std::string s;
 
-    auto append_path = [&] () {
-        if (!s.ends_with('/')) {
-            s += '/';
-        }
-        s += command;
-        list.push_back(s);
-    };
-
-    /* split PATH at colon and append command to paths */
-    for (const char *p = env; *p != 0; p++) {
-        if (*p == ':' && !s.empty()) {
-            append_path();
+    /* split PATH at colons and append command */
+    for (const char *ptr = env; *ptr != 0; ptr++) {
+        if (*ptr == ':' && !s.empty()) {
+            list.push_back(fs::path(s) / command);
             s.clear();
         } else {
-            s += *p;
+            s += *ptr;
         }
     }
 
     if (!s.empty()) {
-        append_path();
+        list.push_back(fs::path(s) / command);
     }
 
     /* check if file exists and is executable */
     for (auto &e : list) {
-        auto st = fs::status(fs::path(e));
+        auto st = fs::status(e);
 
         if (fs::is_regular_file(st) && is_executable(st)) {
             return true;

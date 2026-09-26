@@ -110,7 +110,7 @@ static void get_fps_value(std::string &line)
 }
 
 
-static inline bool check_line(std::string &line, const std::string str)
+static inline bool check_line(std::string &line, const std::string &str)
 {
     if (line.starts_with(str)) {
         line.erase(0, str.size());
@@ -118,6 +118,22 @@ static inline bool check_line(std::string &line, const std::string str)
     }
 
     return false;
+}
+
+
+static const char *type_string(char type)
+{
+    switch (type)
+    {
+    case 'V':
+        return "video";
+    case 'A':
+        return "audio";
+    case 'S':
+        return "subtitles";
+    default:
+        return "other";
+    }
 }
 
 
@@ -286,9 +302,7 @@ bool MKVextract::parse_mkvinfo(std::string &error)
             continue;
         }
         else if (check_line(line, S_language)) {
-            for (size_t i = 0; i < line.size(); i++) {
-                line[i] = toupper(line[i]);
-            }
+            for (auto &c : line) { c = toupper(c); }
             tracks.back().language = line;
             continue;
         }
@@ -384,61 +398,54 @@ bool MKVextract::parse_mkvinfo(std::string &error)
     m_outnames.clear();
 
     for (size_t i = 0; i < tracks.size(); i++) {
-        std::stringstream strm1, strm2;
-        std::string type;
+        std::stringstream entry, filename;
+        char ch = tracks.at(i).codecid[0];
 
-        switch (tracks.at(i).codecid[0])
-        {
-        case 'V': type = "video"; break;
-        case 'A': type = "audio"; break;
-        case 'S': type = "subtitles"; break;
-        default:  type = "other"; break;
-        }
-
-        strm1 << "Track " << i+1 << ": " << type << " [" << tracks.at(i).codecid << "]";
+        /* generic track infos */
+        entry << "Track " << i+1 << ": " << type_string(ch);
+        entry << " [" << tracks.at(i).codecid << "]";
         if (!tracks.at(i).name.empty()) {
-            strm1 << " [" << tracks.at(i).name << "]";
+            entry << " [" << tracks.at(i).name << "]";
         }
-        strm1 << " [" << tracks.at(i).language << "]";
+        entry << " [" << tracks.at(i).language << "]";
 
-        if (type == "video") {
-            strm1 << " [" << tracks.at(i).width << "x" << tracks.at(i).height;
-            strm1 << ", " << tracks.at(i).duration << " fps]";
-
-            /* for now only extract timestamps of video streams */
-            m_timestampIDs.push_back(i);
+        if (ch == 'V') {
+            /* video infos */
+            entry << " [" << tracks.at(i).width << "x" << tracks.at(i).height;
+            entry << ", " << tracks.at(i).duration << " fps]";
+            m_timestampIDs.push_back(i); /* for now only extract timestamps of video streams */
+        } else if (ch == 'A') {
+            /* audio infos */
+            entry << " [" << tracks.at(i).channels << ", " << tracks.at(i).freq << "Hz]";
         }
-        else if (type == "audio") {
-            strm1 << " [" << tracks.at(i).channels << ", " << tracks.at(i).freq << "Hz]";
-        }
 
-        strm2 << "track_" << i+1 << "_" << type;
+        filename << "track_" << i+1 << "_" << type_string(ch);
 
         /* append the correct file extension depending on the codec ID */
         for (const auto &e : mkv_codec_list) {
             if (tracks.at(i).codecid == e.id) {
-                strm2 << '.' << e.ext;
+                filename << '.' << e.ext;
                 break;
             }
         }
 
-        m_outnames.push_back(strm2.str());
-
         Fl::lock();
-        m_browser->add(strm1.str().c_str());
+        m_browser->add(entry.str().c_str());
         Fl::unlock();
+
+        m_outnames.push_back(filename.str());
     }
 
     for (size_t i = 0; i < attachments.size(); i++) {
-        std::stringstream strm;
-
-        strm << "Attachment " << i+1 << ": " << attachments.at(i).filename;
-        strm << " [" << attachments.at(i).filesize << "]";
-        m_outnames.push_back(strm.str());
+        std::stringstream entry;
+        entry << "Attachment " << i+1 << ": " << attachments.at(i).filename;
+        entry << " [" << attachments.at(i).filesize << "]";
 
         Fl::lock();
-        m_browser->add(attachments.at(i).filename.c_str());
+        m_browser->add(entry.str().c_str());
         Fl::unlock();
+
+        m_outnames.push_back(attachments.at(i).filename);
     }
 
     m_track_count = tracks.size();
