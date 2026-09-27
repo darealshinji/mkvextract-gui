@@ -145,14 +145,6 @@ static const char *type_string(char type)
 }
 
 
-/* this function is called by pthread_create() */
-void *MKVextract::thread_run_mkvinfo(void *p)
-{
-    reinterpret_cast<MKVextract *>(p)->run_mkvinfo();
-    return NULL;
-}
-
-
 void MKVextract::run_mkvinfo()
 {
     std::string error;

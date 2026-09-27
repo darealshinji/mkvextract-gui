@@ -25,12 +25,12 @@
 #include <fontconfig/fontconfig.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 
 #include <FL/Fl.H>
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Button.H>
+#include <FL/fl_callback_macros.H>
 #include <FL/Fl_Check_Button.H>
 #include <FL/Fl_Double_Window.H>
 #include <FL/Fl_Group.H>
@@ -43,7 +43,9 @@
 #include <FL/fl_ask.H>
 
 #include <array>
+#include <iterator>
 #include <string>
+#include <utility>
 
 #include "check_browser.hpp"
 #include "dnd.hpp"
@@ -52,20 +54,35 @@
 #include "mkvextract.hpp"
 
 
+/* generate inline Fl_Menu_Item callback function */
+#define LAMBDA(METHOD) \
+    [] (Fl_Widget *, void *p) { \
+        reinterpret_cast<MKVextract *>(p)->METHOD(); \
+    }
 
-static inline void position_at_center(Fl_Double_Window *o)
-{
-    o->position((Fl::w() - o->decorated_w()) / 2,
-                (Fl::h() - o->decorated_h()) / 2);
-}
+/* generate inline pthread_create() start routine */
+#define PTHREAD_LAMBDA(METHOD) \
+    [] (void *p) -> void* { \
+        reinterpret_cast<MKVextract *>(p)->METHOD(); \
+        return NULL; \
+    }
+
+/* generate callback function that calls a private method
+ * from our own class */
+#define MY_CALLBACK(WIDGET, METHOD) \
+    FL_METHOD_CALLBACK_0(WIDGET, MKVextract, this, METHOD)
+
 
 
 void MKVextract::restore_main_window()
 {
     m_but_outdir->activate();
     m_but_add->activate();
-    m_but_extract->label("Extract");
-    m_but_extract->callback(extract_cb, this);
+
+    m_but_abort->deactivate();
+    m_but_abort->hide();
+    m_but_extract->activate();
+    m_but_extract->show();
 
     m_dnd_area->activate();
     m_use_source_path->activate();
@@ -73,38 +90,28 @@ void MKVextract::restore_main_window()
 }
 
 
-/* callback functions */
-
-void MKVextract::dnd_cb(Fl_Widget *, void *p) {
-    reinterpret_cast<MKVextract *>(p)->do_dnd();
-}
-
 void MKVextract::do_dnd()
 {
     std::string items(Fl::event_text());
     size_t pos = items.find('\n');
 
-    if (pos != std::string::npos) {
-        items.erase(pos);
+    if (pos == std::string::npos) {
+        return;
+    }
 
-        if (items.starts_with("file:///")) {
-            /* URI */
-            char *copy = strdup(items.c_str());
-            fl_decode_uri(copy);
-            m_file = copy + 7;
-            free(copy);
-            m_th_info->start();
-        } else if (items.starts_with('/')) {
-            m_file = items;
-            m_th_info->start();
-        }
+    items.erase(pos);
+
+    if (items.starts_with("file:///")) { /* URI */
+        items.erase(0, 7);
+        fl_decode_uri(std::data(items));
+        m_file = std::move(items);
+        m_th_info->start();
+    } else if (items.starts_with('/')) {
+        m_file = std::move(items);
+        m_th_info->start();
     }
 }
 
-
-void MKVextract::browse_outdir_cb(Fl_Widget *, void *p) {
-    reinterpret_cast<MKVextract *>(p)->do_browse_outdir();
-}
 
 void MKVextract::do_browse_outdir()
 {
@@ -126,10 +133,6 @@ void MKVextract::do_browse_outdir()
 }
 
 
-void MKVextract::add_cb(Fl_Widget *, void *p) {
-    reinterpret_cast<MKVextract *>(p)->do_add();
-}
-
 void MKVextract::do_add()
 {
     const char *p;
@@ -144,10 +147,6 @@ void MKVextract::do_add()
 }
 
 
-void MKVextract::clipboard_cb(Fl_Widget *, void *p) {
-    reinterpret_cast<MKVextract *>(p)->do_clipboard();
-}
-
 void MKVextract::do_clipboard()
 {
     char *text = m_txtbuf->text();
@@ -155,10 +154,6 @@ void MKVextract::do_clipboard()
     free(text);
 }
 
-
-void MKVextract::cmd_cb(Fl_Widget *, void *p) {
-    reinterpret_cast<MKVextract *>(p)->do_cmd();
-}
 
 void MKVextract::do_cmd()
 {
@@ -168,10 +163,6 @@ void MKVextract::do_cmd()
 }
 
 
-void MKVextract::extract_cb(Fl_Widget *, void *p) {
-    reinterpret_cast<MKVextract *>(p)->do_extract();
-}
-
 void MKVextract::do_extract()
 {
     m_cmd->hide();
@@ -179,10 +170,6 @@ void MKVextract::do_extract()
     m_th_extract->start();
 }
 
-
-void MKVextract::abort_cb(Fl_Widget *, void *p) {
-    reinterpret_cast<MKVextract *>(p)->do_abort();
-}
 
 void MKVextract::do_abort()
 {
@@ -192,10 +179,6 @@ void MKVextract::do_abort()
     restore_main_window();
 }
 
-
-void MKVextract::check_outdir_cb(Fl_Widget *, void *p) {
-    reinterpret_cast<MKVextract *>(p)->do_check_outdir();
-}
 
 void MKVextract::do_check_outdir()
 {
@@ -208,10 +191,6 @@ void MKVextract::do_check_outdir()
     }
 }
 
-
-void MKVextract::update_browser_cb(Fl_Widget *, void *p) {
-    reinterpret_cast<MKVextract *>(p)->do_update_browser();
-}
 
 void MKVextract::do_update_browser()
 {
@@ -227,10 +206,6 @@ void MKVextract::do_update_browser()
 }
 
 
-void MKVextract::close_cb(Fl_Widget *, void *p) {
-    reinterpret_cast<MKVextract *>(p)->do_close();
-}
-
 void MKVextract::do_close()
 {
     m_th_extract->cancel();
@@ -239,15 +214,6 @@ void MKVextract::do_close()
 }
 
 
-void MKVextract::close_cmd_cb(Fl_Widget *, void *p) {
-    reinterpret_cast<MKVextract *>(p)->m_cmd->hide();
-}
-
-
-void MKVextract::select_all_cb(Fl_Widget *, void *p) {
-    reinterpret_cast<MKVextract *>(p)->do_select_all();
-}
-
 void MKVextract::do_select_all()
 {
     m_browser->check_all();
@@ -255,18 +221,10 @@ void MKVextract::do_select_all()
 }
 
 
-void MKVextract::select_none_cb(Fl_Widget *, void *p) {
-    reinterpret_cast<MKVextract *>(p)->do_select_none();
-}
-
 void MKVextract::do_select_none()
 {
     m_browser->check_none();
     do_update_browser();
-}
-
-
-void MKVextract::dismiss_cb(Fl_Widget *, void *) {
 }
 
 
@@ -280,6 +238,12 @@ MKVextract::MKVextract()
     int x, y, w, h;
 
 
+    auto position_at_center = [] (Fl_Double_Window *o) {
+        o->position((Fl::w() - o->decorated_w()) / 2,
+                    (Fl::h() - o->decorated_h()) / 2);
+    };
+
+
     /* set destination to current working directory */
     m_outdir_manual = fl_getcwd_str();
 
@@ -290,9 +254,9 @@ MKVextract::MKVextract()
     }
 
 
-    /* threads */
-    m_th_info = new posix_thread(thread_run_mkvinfo, this);
-    m_th_extract = new posix_thread(thread_run_mkvextract, this);
+    /* multithreading */
+    m_th_info = new posix_thread (PTHREAD_LAMBDA (run_mkvinfo), this);
+    m_th_extract = new posix_thread (PTHREAD_LAMBDA (run_mkvextract), this);
 
 
     /* init fontconfig */
@@ -318,21 +282,21 @@ MKVextract::MKVextract()
         }
     }
 
-
     static Fl_Menu_Item menu[] = {
         /* text, shortcut, callback, user data, label type */
-        { " Select all",     0, select_all_cb,  this, FL_MENU_INACTIVE                   },
-        { " Select none",    0, select_none_cb, this, FL_MENU_INACTIVE | FL_MENU_DIVIDER },
-        { " Open file",      0, add_cb,         this                                     },
-        { " Close program ", 0, close_cb,       this, FL_MENU_DIVIDER                    },
-        { " Dismiss",        0, dismiss_cb,     NULL                                     },
+        { " Select all ",    0, LAMBDA(do_select_all),  this, FL_MENU_INACTIVE  },
+        { " Select none ",   0, LAMBDA(do_select_none), this, FL_MENU_INACTIVE |
+                                                              FL_MENU_DIVIDER   },
+        { " Open file ",     0, LAMBDA(do_add),         this                    },
+        { " Close program ", 0, LAMBDA(do_close),       this, FL_MENU_DIVIDER   },
+        { " Dismiss ",       0, [](Fl_Widget*, void*){}                         },
         { 0 }
     };
 
 
     /* main window */
     m_win = new Fl_Double_Window(800, 480, "simple mkvextract GUI");
-    m_win->callback(close_cb, this);
+    MY_CALLBACK(m_win, do_close);
 
         /* upper area group */
         h = bt_h + 5;
@@ -341,7 +305,7 @@ MKVextract::MKVextract()
             /* "Open file" button */
             x = m_win->w() - 10 - bt_w;
             m_but_add = new Fl_Button(x, 5, bt_w, bt_h, "Open file");
-            m_but_add->callback(add_cb, this);
+            MY_CALLBACK(m_but_add, do_add);
 
             /* input file label */
             w = m_but_add->x() - 20;
@@ -364,15 +328,23 @@ MKVextract::MKVextract()
             x = m_win->w() - 10 - bt_w;
             y = m_win->h() - 10 - bt_h;
             m_but_extract = new Fl_Button(x, y, bt_w, bt_h, "Extract");
-            m_but_extract->callback(extract_cb, this);
             m_but_extract->deactivate();
+            MY_CALLBACK(m_but_extract, do_extract);
+
+            /* "Abort" button */
+            x = m_but_extract->x();
+            y = m_but_extract->y();
+            m_but_abort = new Fl_Button(x, y, bt_w, bt_h, "Abort");
+            m_but_abort->deactivate();
+            m_but_abort->hide();
+            MY_CALLBACK(m_but_abort, do_abort);
 
             /* "Command" button */
             x = m_but_extract->x() - 10 - bt_w;
             y = m_but_extract->y();
             m_but_cmd = new Fl_Button(x, y, bt_w, bt_h, "Command");
-            m_but_cmd->callback(cmd_cb, this);
             m_but_cmd->deactivate();
+            MY_CALLBACK(m_but_cmd, do_cmd);
 
             /* progress area group */
             y = m_but_extract->y();
@@ -416,13 +388,13 @@ MKVextract::MKVextract()
             y = m_but_extract->y() - bt_h - 5;
             m_use_source_path = new Fl_Check_Button(x, y, bt_w, bt_h, " Source path");
             m_use_source_path->deactivate();
-            m_use_source_path->callback(check_outdir_cb, this);
+            MY_CALLBACK(m_use_source_path, do_check_outdir);
 
             /* "Destination" button */
             x = m_but_cmd->x();
             y = m_use_source_path->y();
             m_but_outdir = new Fl_Button(x, y, bt_w, bt_h, "Destination");
-            m_but_outdir->callback(browse_outdir_cb, this);
+            MY_CALLBACK(m_but_outdir, do_browse_outdir);
 
         g_bttm->end();
         g_bttm->resizable(g_outd);
@@ -432,12 +404,12 @@ MKVextract::MKVextract()
         w = m_win->w() - 20;
         h = m_win->h() - bt_h*3 - 35;
         m_browser = new check_browser(10, y, w, h);
-        m_browser->callback(update_browser_cb, this);
         m_browser->menu(menu);
+        MY_CALLBACK(m_browser, do_update_browser);
 
         /* drag 'n drop area */
         m_dnd_area = new dnd_box(0, 0, m_win->w(), m_win->h());
-        m_dnd_area->callback(dnd_cb, this);
+        MY_CALLBACK(m_dnd_area, do_dnd);
 
     m_win->end();
     m_win->resizable(m_browser);
@@ -465,13 +437,13 @@ MKVextract::MKVextract()
             x = m_cmd->w() - 110 - 15;
             y = txt->h() + txt->y() + 6;
             auto btclose = new Fl_Button(x, y, 110, bt_h, "Close");
-            btclose->callback(close_cmd_cb, this);
+            FL_METHOD_CALLBACK_0(btclose, Fl_Double_Window, m_cmd, hide);
 
             /* "Copy to clipboard" button */
             x = btclose->x() - 150 - 5;
             y = btclose->y();
             auto btcopy = new Fl_Button(x, y, 150, bt_h, "Copy to clipboard");
-            btcopy->callback(clipboard_cb, this);
+            MY_CALLBACK(btcopy, do_clipboard);
 
             /* dummy */
             x = btcopy->x() - 1;

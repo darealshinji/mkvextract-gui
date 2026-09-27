@@ -39,14 +39,6 @@
 #include "mkvextract.hpp"
 
 
-/* this function is called by pthread_create() */
-void *MKVextract::thread_run_mkvextract(void *p)
-{
-    reinterpret_cast<MKVextract *>(p)->run_mkvextract();
-    return NULL;
-}
-
-
 void MKVextract::run_mkvextract()
 {
     std::string base, xml, ogm;
@@ -72,8 +64,12 @@ void MKVextract::run_mkvextract()
     m_but_outdir->deactivate();
     m_but_add->deactivate();
 
-    m_but_extract->label("Abort");
-    m_but_extract->callback(abort_cb, this);
+    m_but_extract->deactivate();
+    m_but_extract->hide();
+
+    m_but_abort->activate();
+    m_but_abort->show();
+
     m_rotate->activate();
 
     Fl::unlock();

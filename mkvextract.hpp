@@ -63,13 +63,9 @@ private:
     /* multithreading */
     posix_thread *m_th_info;
     posix_thread *m_th_extract;
-
-    static void *thread_run_mkvinfo(void *p);
+    void run_mkvextract();
     void run_mkvinfo();
     bool parse_mkvinfo(std::string &error);
-
-    static void *thread_run_mkvextract(void *p);
-    void run_mkvextract();
 
 
     /* windows */
@@ -82,6 +78,7 @@ private:
     Fl_Button *m_but_outdir;
     Fl_Button *m_but_add;
     Fl_Button *m_but_extract;
+    Fl_Button *m_but_abort;
     Fl_Button *m_but_cmd;
     Fl_Box *m_progress_box;
     Fl_Box *m_outdir_field;
@@ -95,31 +92,13 @@ private:
     rotate *m_rotate;
 
 
-    /* callbacks */
-    static void abort_cb(Fl_Widget *, void *p);
-    static void add_cb(Fl_Widget *, void *p);
-    static void browse_outdir_cb(Fl_Widget *, void *p);
-    static void check_outdir_cb(Fl_Widget *, void *p);
-    static void clipboard_cb(Fl_Widget *, void *p);
-    static void close_cb(Fl_Widget *, void *p);
-    static void close_cmd_cb(Fl_Widget *, void *p);
-    static void cmd_cb(Fl_Widget *, void *p);
-    static void dismiss_cb(Fl_Widget *, void *p);
-    static void dnd_cb(Fl_Widget *, void *p);
-    static void extract_cb(Fl_Widget *, void *p);
-    static void select_all_cb(Fl_Widget *, void *p);
-    static void select_none_cb(Fl_Widget *, void *p);
-    static void update_browser_cb(Fl_Widget *, void *p);
-
     void do_abort();
     void do_add();
     void do_browse_outdir();
     void do_check_outdir();
     void do_clipboard();
     void do_close();
-    //void do_close_cmd();
     void do_cmd();
-    //void do_dismiss();
     void do_dnd();
     void do_extract();
     void do_select_all();
