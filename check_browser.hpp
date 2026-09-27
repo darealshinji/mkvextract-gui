@@ -59,14 +59,12 @@ protected:
 
     int handle(int event)
     {
-        if (event == FL_PUSH) {
-            if (Fl::event_button() == FL_RIGHT_MOUSE) {
-                auto m = m_menu->popup(Fl::event_x(), Fl::event_y());
-                if (m) m->do_callback(NULL);
-                return 1;
-            }
-
-            deselect();
+        if (m_menu && event == FL_PUSH &&
+            Fl::event_button() == FL_RIGHT_MOUSE)
+        {
+            auto m = m_menu->popup(Fl::event_x(), Fl::event_y());
+            if (m) m->do_callback(NULL);
+            return 1;
         }
 
         return Fl_Check_Browser::handle(event);
