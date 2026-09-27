@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include <stddef.h>
 #include <FL/Fl.H>
 #include <FL/Fl_Check_Browser.H>
 #include <FL/Fl_Menu_Item.H>

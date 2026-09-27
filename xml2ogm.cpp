@@ -44,14 +44,17 @@ CHAPTER02=00:21:34.534
 CHAPTER02NAME=Chapter 02
 **/
 
-#include <fstream>
-#include <iomanip>
-#include <iostream>
-#include <regex>
-#include <sstream>
-#include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <tinyxml2.h>
+
+#include <fstream>
+#include <regex>
+#include <string>
+#include <sstream>
+#include <utility>
+
 
 
 static inline bool empty(const char *str)
@@ -105,9 +108,9 @@ static const char *get_chapter_name(tinyxml2::XMLElement *atom)
 }
 
 
-static void save_chapter_entry(tinyxml2::XMLElement *atom, std::string time, int i, std::string &ogm)
+static std::string save_chapter_entry(tinyxml2::XMLElement *atom, const char *time, int i)
 {
-    std::smatch match;
+    std::cmatch match;
     std::stringstream strm;
     char buf_num[32];
     char buf_time[64];
@@ -115,7 +118,7 @@ static void save_chapter_entry(tinyxml2::XMLElement *atom, std::string time, int
     const std::regex reg("^([0-9]+):([0-9]+):([0-9]+)(\\.[0-9]+)?");
 
     if (!std::regex_match(time, match, reg) || match.size() != 5) {
-        return;
+        return {};
     }
 
     int h = atoi(match.str(1).c_str());  /* hours */
@@ -123,7 +126,7 @@ static void save_chapter_entry(tinyxml2::XMLElement *atom, std::string time, int
     int s = atof(match.str(3).c_str());  /* seconds */
 
     if (h > 99 || m > 59 || s > 59) {
-        return;
+        return {};
     }
 
     /* milliseconds with exactly three digits */
@@ -152,8 +155,7 @@ static void save_chapter_entry(tinyxml2::XMLElement *atom, std::string time, int
         strm << name << '\n';
     }
 
-    /* save entry */
-    ogm += strm.str();
+    return strm.str();
 }
 
 
@@ -231,7 +233,7 @@ bool xml2ogm(const char *input, const char *output)
 
         /* save OGM format chapter entry */
         if (!empty(time)) {
-            save_chapter_entry(atom, time, i, ogm);
+            ogm += save_chapter_entry(atom, time, i);
         }
     }
 

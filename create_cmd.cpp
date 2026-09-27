@@ -22,9 +22,12 @@
  SOFTWARE.
 **/
 
+#include <stddef.h>
+#include <FL/Fl_Check_Button.H>
 #include <sstream>
 #include <string>
 #include <vector>
+
 #include "check_browser.hpp"
 #include "mkvextract.hpp"
 

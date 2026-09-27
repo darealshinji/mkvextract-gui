@@ -22,12 +22,13 @@
  SOFTWARE.
 **/
 
-#include <vector>
-#include <string>
 #include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <iterator>
+#include <string>
+#include <vector>
 
 #include "pipe_command.hpp"
 

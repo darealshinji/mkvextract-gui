@@ -24,10 +24,10 @@
 
 #pragma once
 
-#include <FL/Fl.H>
-#include <FL/Fl_Box.H>
-#include <FL/Fl_SVG_Image.H>
 #include <vector>
+
+class Fl_Box;
+class Fl_SVG_Image;
 
 
 class rotate

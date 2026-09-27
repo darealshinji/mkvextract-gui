@@ -22,37 +22,31 @@
  SOFTWARE.
 **/
 
-#include <FL/Fl.H>
-#include <FL/fl_ask.H>
-#include <FL/Fl_Box.H>
-#include <FL/Fl_Button.H>
-#include <FL/Fl_Check_Button.H>
-#include <FL/Fl_Native_File_Chooser.H>
-#include <FL/Fl_PNG_Image.H>
-#include <FL/Fl_SVG_Image.H>
-#include <FL/Fl_Text_Display.H>
-#include <FL/Fl_Double_Window.H>
-#include <FL/filename.H>
 #include <fontconfig/fontconfig.h>
-
-#include <cstdlib>
-#include <array>
-#include <iostream>
-#include <filesystem>
-#include <sstream>
-#include <string>
-#include <vector>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#include "dnd.hpp"
+#include <FL/Fl.H>
+#include <FL/Fl_Box.H>
+#include <FL/Fl_Button.H>
+#include <FL/Fl_Check_Button.H>
+#include <FL/Fl_Double_Window.H>
+#include <FL/Fl_Group.H>
+#include <FL/Fl_Menu_Item.H>
+#include <FL/Fl_Native_File_Chooser.H>
+#include <FL/Fl_PNG_Image.H>
+#include <FL/Fl_Text_Buffer.H>
+#include <FL/Fl_Text_Display.H>
+#include <FL/filename.H>
+#include <FL/fl_ask.H>
+
+#include <array>
+#include <string>
+
 #include "check_browser.hpp"
-#include "pipe_command.hpp"
+#include "dnd.hpp"
 #include "posix_thread.hpp"
 #include "rotate.hpp"
 #include "mkvextract.hpp"
@@ -319,7 +313,7 @@ MKVextract::MKVextract()
         Fl_PNG_Image icon(e);
 
         if (!icon.fail()) {
-            Fl_Window::default_icon(&icon);
+            Fl_Double_Window::default_icon(&icon);
             break;
         }
     }

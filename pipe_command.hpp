@@ -22,10 +22,10 @@
  SOFTWARE.
 **/
 
+#include <stdio.h>
+#include <sys/types.h>
 #include <vector>
 #include <string>
-#include <stdio.h>
-#include <unistd.h>
 
 
 class pipe_command

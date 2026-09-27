@@ -22,8 +22,8 @@
  SOFTWARE.
 **/
 
-#include <string>
 #include <ctype.h>
+#include <string>
 
 
 enum {

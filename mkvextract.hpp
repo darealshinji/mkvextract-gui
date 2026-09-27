@@ -24,23 +24,23 @@
 
 #pragma once
 
-#include <FL/Fl.H>
-#include <FL/Fl_Box.H>
-#include <FL/Fl_Button.H>
-#include <FL/Fl_Check_Button.H>
-#include <FL/Fl_Native_File_Chooser.H>
-#include <FL/Fl_Text_Display.H>
-#include <FL/Fl_Double_Window.H>
-
+#include <stdio.h>
+#include <stdlib.h>
 #include <filesystem>
 #include <string>
 #include <vector>
-#include <stdio.h>
 
-#include "dnd.hpp"
-#include "check_browser.hpp"
-#include "posix_thread.hpp"
-#include "rotate.hpp"
+class Fl_Box;
+class Fl_Button;
+class Fl_Check_Button;
+class Fl_Double_Window;
+class Fl_Native_File_Chooser;
+class Fl_Text_Buffer;
+class Fl_Widget;
+class check_browser;
+class dnd_box;
+class posix_thread;
+class rotate;
 
 
 class MKVextract

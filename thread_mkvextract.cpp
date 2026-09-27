@@ -22,18 +22,20 @@
  SOFTWARE.
 **/
 
-#include <fstream>
-#include <sstream>
-#include <string>
-#include <vector>
-#include <ctype.h>
-#include <signal.h>
-#include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
+
+#include <FL/Fl.H>
+#include <FL/Fl_Box.H>
+#include <FL/Fl_Button.H>
+#include <FL/Fl_Check_Button.H>
+#include <FL/fl_ask.H>
+#include <string>
+
+#include "check_browser.hpp"
+#include "dnd.hpp"
 #include "pipe_command.hpp"
+#include "rotate.hpp"
 #include "mkvextract.hpp"
 
 
