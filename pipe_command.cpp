@@ -33,20 +33,8 @@
 #include "pipe_command.hpp"
 
 
-pipe_command::pipe_command(char **argv)
-: m_argv(argv)
+pipe_command::pipe_command()
 {}
-
-
-pipe_command::pipe_command(const std::vector<std::string> &argv)
-{
-    for (auto &e : argv) {
-        m_vec.push_back(const_cast<char *>(e.c_str()));
-    }
-
-    m_vec.push_back(NULL);
-    m_argv = std::data(m_vec);
-}
 
 
 pipe_command::~pipe_command()
@@ -55,14 +43,14 @@ pipe_command::~pipe_command()
 }
 
 
-FILE *pipe_command::pipe_open()
+FILE *pipe_command::pipe_open(char **argv)
 {
     enum { r = 0, w = 1 };
     int fd[2];
 
     pipe_close();
 
-    if (!m_argv || pipe2(fd, O_CLOEXEC) == -1) {
+    if (!argv || pipe2(fd, O_CLOEXEC) == -1) {
         return NULL;
     }
 
@@ -76,9 +64,23 @@ FILE *pipe_command::pipe_open()
     dup2(fd[w], 1);
     close(fd[w]);
 
-    execvp(m_argv[0], m_argv);
+    execvp(argv[0], argv);
 
     _exit(127);
+}
+
+
+FILE *pipe_command::pipe_open(const std::vector<std::string> &argv)
+{
+    std::vector<char*> vec;
+
+    for (auto &e : argv) {
+        vec.push_back(const_cast<char *>(e.c_str()));
+    }
+
+    vec.push_back(NULL);
+
+    return pipe_open(std::data(vec));
 }
 
 
@@ -86,12 +88,13 @@ void pipe_command::pipe_close()
 {
     if (m_fp) {
         fclose(m_fp);
-        m_fp = NULL;
     }
 
     if (m_pid > getpid()) {
         kill(m_pid, 1);
-        m_pid = -1;
     }
+
+    m_fp = NULL;
+    m_pid = -1;
 }
 

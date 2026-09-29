@@ -32,18 +32,17 @@ class pipe_command
 {
 private:
 
-    char **m_argv = NULL;
-    std::vector<char *>m_vec;
     pid_t m_pid = -1;
     FILE *m_fp = NULL;
 
+
 public:
 
-    pipe_command(char **argv);
-    pipe_command(const std::vector<std::string> &argv);
+    pipe_command();
     ~pipe_command();
 
-    FILE *pipe_open();
+    FILE *pipe_open(char **argv);
+    FILE *pipe_open(const std::vector<std::string> &argv);
     void pipe_close();
 };
 

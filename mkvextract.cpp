@@ -115,12 +115,16 @@ void MKVextract::do_dnd()
     if (items.starts_with("file:///")) { /* URI */
         items.erase(0, 7);
         fl_decode_uri(std::data(items));
-        m_file = std::move(items);
-        m_th_info->start();
-    } else if (items.starts_with('/')) {
-        m_file = std::move(items);
-        m_th_info->start();
+    } else if (!items.starts_with('/')) {
+        return;
     }
+
+    /* stop running threads */
+    m_th_extract->cancel();
+    m_th_info->cancel();
+
+    m_file = std::move(items);
+    m_th_info->start();
 }
 
 
@@ -152,6 +156,10 @@ void MKVextract::do_add()
     m_fcfile->filter("*.mkv|*.mka|*.mks|*.mk3d|*.webm"); /* https://www.matroska.org */
 
     if (m_fcfile->show() == 0 && (p = m_fcfile->filename()) != NULL && *p != 0) {
+        /* stop running threads */
+        m_th_extract->cancel();
+        m_th_info->cancel();
+
         m_file = p;
         m_th_info->start();
     }
@@ -176,8 +184,13 @@ void MKVextract::do_cmd()
 
 void MKVextract::do_extract()
 {
+    /* stop running threads */
+    m_th_extract->cancel();
+    m_th_info->cancel();
+
     m_cmd->hide();
     m_win->redraw();
+
     m_th_extract->start();
 }
 
@@ -266,8 +279,8 @@ MKVextract::MKVextract()
 
 
     /* multithreading */
-    m_th_info = new posix_thread (PTHREADCB(run_mkvinfo), this);
     m_th_extract = new posix_thread (PTHREADCB(run_mkvextract), this);
+    m_th_info = new posix_thread (PTHREADCB(run_mkvinfo), this);
 
 
     /* init fontconfig */
@@ -488,12 +501,19 @@ MKVextract::MKVextract()
 /* d'tor */
 MKVextract::~MKVextract()
 {
+    /* threads */
+    delete m_th_extract;
+    delete m_th_info;
+    delete m_rotate;
+
+    /* main widgets */
     delete m_cmd;
     delete m_win;
     delete m_txtbuf;
+
+    /* file choosers */
     delete m_fcdir;
     delete m_fcfile;
-    delete m_rotate;
 }
 
 

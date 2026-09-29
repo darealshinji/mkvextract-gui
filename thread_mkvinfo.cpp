@@ -202,6 +202,7 @@ void MKVextract::run_mkvinfo()
 /* read output of mkvinfo */
 bool MKVextract::parse_mkvinfo(std::string &error)
 {
+    pipe_command cmd;
     std::ifstream ifs;
     std::vector<struct track_info> tracks;
     std::vector<struct attachment_info> attach;
@@ -224,8 +225,7 @@ bool MKVextract::parse_mkvinfo(std::string &error)
     };
 
     /* run mkvinfo */
-    pipe_command cmd(const_cast<char **>(args));
-    FILE *fp = cmd.pipe_open();
+    FILE *fp = cmd.pipe_open(const_cast<char **>(args));
 
     if (!fp) {
         error = "cannot read output from mkvinfo";

@@ -47,8 +47,11 @@ public:
     : m_fn(fn), m_data(data)
     {}
 
-    ~posix_thread() {
-        cancel();
+    ~posix_thread()
+    {
+        if (m_running) {
+            pthread_cancel(m_thread);
+        }
     }
 
     void start()
@@ -64,6 +67,7 @@ public:
     {
         if (m_running) {
             pthread_cancel(m_thread);
+            pthread_join(m_thread, NULL);
             m_running = false;
         }
     }

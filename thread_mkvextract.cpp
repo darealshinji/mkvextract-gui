@@ -42,6 +42,7 @@
 
 void MKVextract::run_mkvextract()
 {
+    pipe_command cmd;
     std::string base, xml, ogm;
 
     /* check for command */
@@ -78,8 +79,7 @@ void MKVextract::run_mkvextract()
     Fl::awake();
 
     /* create pipe */
-    pipe_command cmd(m_args);
-    FILE *fp = cmd.pipe_open();
+    FILE *fp = cmd.pipe_open(m_args);
 
     if (!fp) {
         Fl::lock();

@@ -60,21 +60,21 @@ private:
     std::vector<std::string> m_args;
 
 
-    /* multithreading */
-    posix_thread *m_th_info;
-    posix_thread *m_th_extract;
+    /* mkvextract/mkvinfo */
     void run_mkvextract();
     void run_mkvinfo();
     bool parse_mkvinfo(std::string &error);
 
 
     /* these objects must be deleted in the d'tor */
+    posix_thread *m_th_info;
+    posix_thread *m_th_extract;
+    rotate *m_rotate;
     Fl_Double_Window *m_win;
     Fl_Double_Window *m_cmd;
     Fl_Text_Buffer *m_txtbuf;
     Fl_Native_File_Chooser *m_fcdir;
     Fl_Native_File_Chooser *m_fcfile;
-    rotate *m_rotate;
 
 
     /* widgets (automatically deleted) */
