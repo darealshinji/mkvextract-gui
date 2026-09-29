@@ -60,7 +60,7 @@ public:
         when(FL_WHEN_CHANGED);
     }
 
-    ~check_browser() {
+    virtual ~check_browser() {
         Fl_Check_Browser::clear();
     }
 
