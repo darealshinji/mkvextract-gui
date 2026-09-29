@@ -38,6 +38,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "check_browser.hpp"
@@ -48,19 +49,19 @@
 
 
 struct track_info {
-    std::string codecid;
-    std::string duration;
+    std::string codec;
+    std::string fps;
     std::string name;
-    std::string language;
-    std::string width;
-    std::string height;
+    std::string lang;
+    std::string w;
+    std::string h;
     std::string freq;
     std::string channels;
 };
 
 struct attachment_info {
-    std::string filename;
-    std::string filesize;
+    std::string name;
+    std::string size;
 };
 
 
@@ -106,11 +107,11 @@ static inline bool find(const std::string &haystack, char needle, size_t &pos) {
 
 static void get_fps_value(std::string &line)
 {
-    const char str[] = " frames/fields per second for a video track)";
+    constexpr std::string_view str{" frames/fields per second for a video track)"};
     size_t pos;
 
     if (find(line, '(', pos) && line.ends_with(str)) {
-        line.erase(line.size() - sizeof(str) - 1);
+        line.erase(line.size() - str.size());
         line.erase(0, pos + 1);
     } else {
         line = "??";
@@ -118,7 +119,8 @@ static void get_fps_value(std::string &line)
 }
 
 
-static inline bool check_line(std::string &line, const std::string &str)
+/* check if line begins with str, removes str if true */
+static inline bool match(std::string &line, const std::string_view &str)
 {
     if (line.starts_with(str)) {
         line.erase(0, str.size());
@@ -202,7 +204,7 @@ bool MKVextract::parse_mkvinfo(std::string &error)
 {
     std::ifstream ifs;
     std::vector<struct track_info> tracks;
-    std::vector<struct attachment_info> attachments;
+    std::vector<struct attachment_info> attach;
 
     error.clear();
 
@@ -229,20 +231,6 @@ bool MKVextract::parse_mkvinfo(std::string &error)
         error = "cannot read output from mkvinfo";
         return false;
     }
-
-    const std::string
-        S_codecid =  "|  + Codec ID: ",
-        S_duration = "|  + Default duration: ",
-        S_name =     "|  + Name: ",
-        S_language = "|  + Language: ",
-        S_tvideo =   "|  + Video track",
-        S_taudio =   "|  + Audio track",
-        S_width =    "|   + Pixel width: ",
-        S_height =   "|   + Pixel height: ",
-        S_freq =     "|   + Sampling frequency: ",
-        S_channels = "|   + Channels: ",
-        S_filename = "|  + File name: ",
-        S_filesize = "|  + File data: size ";
 
     enum { tnone = 0, tvideo = 1, taudio = 2 };
     unsigned short track_entry = tnone;
@@ -283,27 +271,27 @@ bool MKVextract::parse_mkvinfo(std::string &error)
         }
 
         if (line == "| + Track") {
-            struct track_info track_info = { .language = "UND" };
+            struct track_info track_info = { .lang = "UND" };
             tracks.push_back(track_info);
             track_entry = tnone;
             continue;
         }
-        else if (check_line(line, S_codecid)) {
-            tracks.back().codecid = line;
+        else if (match(line, "|  + Codec ID: ")) {
+            tracks.back().codec = line;
             continue;
         }
-        else if (check_line(line, S_duration)) {
+        else if (match(line, "|  + Default duration: ")) {
             get_fps_value(line);
-            tracks.back().duration = line;
+            tracks.back().fps = line;
             continue;
         }
-        else if (check_line(line, S_name)) {
+        else if (match(line, "|  + Name: ")) {
             tracks.back().name = line;
             continue;
         }
-        else if (check_line(line, S_language)) {
+        else if (match(line, "|  + Language: ")) {
             for (auto &c : line) { c = toupper(c); }
-            tracks.back().language = line;
+            tracks.back().lang = line;
             continue;
         }
         else if (line.starts_with("|+")) {
@@ -312,27 +300,27 @@ bool MKVextract::parse_mkvinfo(std::string &error)
         }
 
         if (track_entry == tnone) {
-            if (check_line(line, S_taudio)) {
+            if (match(line, "|  + Audio track")) {
                 track_entry = taudio;
                 continue;
             }
-            else if (check_line(line, S_tvideo)) {
+            else if (match(line, "|  + Video track")) {
                 track_entry = tvideo;
                 continue;
             }
         }
         else if (track_entry == tvideo) {
-            if (check_line(line, S_width)) {
-                tracks.back().width = line;
+            if (match(line, "|   + Pixel width: ")) {
+                tracks.back().w = line;
                 continue;
             }
-            else if (check_line(line, S_height)) {
-                tracks.back().height = line;
+            else if (match(line, "|   + Pixel height: ")) {
+                tracks.back().h = line;
                 continue;
             }
         }
         else if (track_entry == taudio) {
-            if (check_line(line, S_channels)) {
+            if (match(line, "|   + Channels: ")) {
                 if (line == "2") {
                     line = "stereo";
                 } else {
@@ -341,13 +329,14 @@ bool MKVextract::parse_mkvinfo(std::string &error)
                 tracks.back().channels = line;
                 continue;
             }
-            else if (check_line(line, S_freq)) {
+            else if (match(line, "|   + Sampling frequency: ")) {
                 tracks.back().freq = line;
                 continue;
+            } else {
+                /* no entry means mono */
+                tracks.back().channels = "mono";
+                continue;
             }
-
-            /* no entry means mono */
-            tracks.back().channels = "mono";
         }
     }
 
@@ -367,15 +356,15 @@ bool MKVextract::parse_mkvinfo(std::string &error)
 
             if (line == "| + Attached") {
                 struct attachment_info info;
-                attachments.push_back(info);
+                attach.push_back(info);
                 continue;
             }
-            else if (check_line(line, S_filename)) {
-                attachments.back().filename = line;
+            else if (match(line, "|  + File name: ")) {
+                attach.back().name = line;
                 continue;
             }
-            else if (check_line(line, S_filesize)) {
-                attachments.back().filesize = human_readable_size(line);
+            else if (match(line, "|  + File data: size ")) {
+                attach.back().size = human_readable_size(line);
                 continue;
             }
             else if (line == "|+ Chapters") {
@@ -398,58 +387,56 @@ bool MKVextract::parse_mkvinfo(std::string &error)
     m_outnames.clear();
 
     for (size_t i = 0; i < tracks.size(); i++) {
-        std::stringstream entry, filename;
-        char ch = tracks.at(i).codecid[0];
+        std::stringstream e; /* browser entry */
+        std::stringstream filename;
+        char c = tracks.at(i).codec[0];
 
         /* generic track infos */
-        entry << "Track " << i+1 << ": " << type_string(ch);
-        entry << " [" << tracks.at(i).codecid << "]";
+        e << "Track " << i+1 << ": " << type_string(c) << " [" << tracks.at(i).codec << "]";
         if (!tracks.at(i).name.empty()) {
-            entry << " [" << tracks.at(i).name << "]";
+            e << " [" << tracks.at(i).name << "]";
         }
-        entry << " [" << tracks.at(i).language << "]";
+        e << " [" << tracks.at(i).lang << "]";
 
-        if (ch == 'V') {
+        if (c == 'V') {
             /* video infos */
-            entry << " [" << tracks.at(i).width << "x" << tracks.at(i).height;
-            entry << ", " << tracks.at(i).duration << " fps]";
-            m_timestampIDs.push_back(i); /* for now only extract timestamps of video streams */
-        } else if (ch == 'A') {
+            e << " [" << tracks.at(i).w << "x" << tracks.at(i).h << ", " << tracks.at(i).fps << " fps]";
+            m_timestampIDs.push_back(i); /* extract ony timestamps of video streams */
+        } else if (c == 'A') {
             /* audio infos */
-            entry << " [" << tracks.at(i).channels << ", " << tracks.at(i).freq << "Hz]";
+            e << " [" << tracks.at(i).channels << ", " << tracks.at(i).freq << "Hz]";
         }
 
-        filename << "track_" << i+1 << "_" << type_string(ch);
+        filename << "track " << i+1 << " " << type_string(c);
 
         /* append the correct file extension depending on the codec ID */
-        for (const auto &e : mkv_codec_list) {
-            if (tracks.at(i).codecid == e.id) {
-                filename << '.' << e.ext;
+        for (const auto &codec : mkv_codec_list) {
+            if (tracks.at(i).codec == codec.id) {
+                filename << '.' << codec.ext;
                 break;
             }
         }
 
         Fl::lock();
-        m_browser->add(entry.str().c_str());
+        m_browser->add(e.str().c_str());
         Fl::unlock();
 
         m_outnames.push_back(filename.str());
     }
 
-    for (size_t i = 0; i < attachments.size(); i++) {
-        std::stringstream entry;
-        entry << "Attachment " << i+1 << ": " << attachments.at(i).filename;
-        entry << " [" << attachments.at(i).filesize << "]";
+    for (size_t i = 0; i < attach.size(); i++) {
+        std::stringstream e; /* browser entry */
+        e << "Attachment " << i+1 << ": " << attach.at(i).name << " [" << attach.at(i).size << "]";
 
         Fl::lock();
-        m_browser->add(entry.str().c_str());
+        m_browser->add(e.str().c_str());
         Fl::unlock();
 
-        m_outnames.push_back(attachments.at(i).filename);
+        m_outnames.push_back(attach.at(i).name);
     }
 
     m_track_count = tracks.size();
-    m_attach_count = attachments.size();
+    m_attach_count = attach.size();
     m_timestamps_entry = 0;
     m_chapters_entry = 0;
     bool has_timestamps = m_timestampIDs.size() > 0;
