@@ -50,7 +50,7 @@
 #include "check_browser.hpp"
 #include "dnd.hpp"
 #include "posix_thread.hpp"
-#include "rotate.hpp"
+#include "rotate_box.hpp"
 #include "mkvextract.hpp"
 
 
@@ -97,7 +97,7 @@ void MKVextract::restore_main_window()
 
     m_dnd_area->activate();
     m_use_source_path->activate();
-    m_rotate->deactivate();
+    m_rotate->stop();
 }
 
 
@@ -384,7 +384,7 @@ MKVextract::MKVextract()
                 /* icon box */
                 x = bt_w + 15;
                 y = m_progress_box->y();
-                auto box_rotating_icon = new Fl_Box(FL_NO_BOX, x, y, bt_h, bt_h, NULL);
+                m_rotate = new rotate_box(x, y, bt_h, bt_h);
 
                 /* dummy */
                 x = m_but_cmd->x() - 1;
@@ -491,10 +491,6 @@ MKVextract::MKVextract()
     /* text buffer */
     m_txtbuf = new Fl_Text_Buffer();
     txt->buffer(m_txtbuf);
-
-
-    /* rotating icon */
-    m_rotate = new rotate(box_rotating_icon);
 }
 
 
@@ -504,7 +500,6 @@ MKVextract::~MKVextract()
     /* threads */
     delete m_th_extract;
     delete m_th_info;
-    delete m_rotate;
 
     /* main widgets */
     delete m_cmd;
@@ -526,7 +521,7 @@ void MKVextract::show(const char *file)
     m_win->show();
 
     /* test timeout handler */
-    //m_rotate->activate();
+    //m_rotate->start();
 
     if (file && *file) {
         if (fl_filename_isdir(file)) {

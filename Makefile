@@ -7,7 +7,7 @@ OBJS = \
 	mkvextract.o \
 	pipe_command.o \
 	quote_filename.o \
-	rotate.o \
+	rotate_box.o \
 	thread_mkvinfo.o \
 	thread_mkvextract.o \
 	xml2ogm.o \

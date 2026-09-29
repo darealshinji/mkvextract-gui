@@ -30,7 +30,7 @@
 #include <vector>
 #include <stdio.h>
 
-#include "rotate.hpp"
+#include "rotate_box.hpp"
 
 #define TIMEOUT_SPEED 0.1 /* seconds */
 
@@ -56,25 +56,26 @@ bool find_at_pos(const std::string &haystack, char const (&needle)[N], size_t &p
 }
 
 
-void rotate::next_frame_cb(void *p) {
-    reinterpret_cast<rotate *>(p)->do_next_frame();
+void rotate_box::next_frame_cb(void *p) {
+    reinterpret_cast<rotate_box *>(p)->do_next_frame();
 }
 
 
-void rotate::do_next_frame()
+void rotate_box::do_next_frame()
 {
     if (++m_frame == m_array.end()) {
         m_frame = m_array.begin();
     }
 
-    m_box->image(*m_frame);
-    m_box->parent()->redraw();
+    image(*m_frame);
+    parent()->redraw();
 
     Fl::repeat_timeout(TIMEOUT_SPEED, next_frame_cb, this);
 }
 
 
-rotate::rotate(Fl_Box *o) : m_box(o)
+rotate_box::rotate_box(int X, int Y, int W, int H)
+: Fl_Box(FL_NO_BOX, X, Y, W, H, NULL)
 {
     std::string copy;
 
@@ -99,14 +100,14 @@ rotate::rotate(Fl_Box *o) : m_box(o)
         //putchar('\n');
 
         m_array.push_back(new Fl_SVG_Image(NULL, copy.c_str()));
-        m_array.back()->resize(m_box->w(), m_box->h());
+        m_array.back()->resize(W, H);
     }
 }
 
 
-rotate::~rotate()
+rotate_box::~rotate_box()
 {
-    deactivate();
+    stop();
 
     while (!m_array.empty()) {
         delete m_array.back();
@@ -115,17 +116,27 @@ rotate::~rotate()
 }
 
 
-void rotate::activate()
+void rotate_box::start()
 {
+    if (m_running) {
+        return;
+    }
+
     m_frame = m_array.begin();
-    m_box->image(*m_frame);
+    image(*m_frame);
+
     Fl::add_timeout(TIMEOUT_SPEED, next_frame_cb, this);
+    m_running = true;
 }
 
 
-void rotate::deactivate()
+void rotate_box::stop()
 {
-    Fl::remove_timeout(next_frame_cb);
-    m_box->image(NULL);
+    if (m_running) {
+        Fl::remove_timeout(next_frame_cb);
+    }
+
+    image(NULL);
+    m_running = false;
 }
 

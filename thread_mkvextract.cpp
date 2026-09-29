@@ -36,7 +36,7 @@
 #include "check_browser.hpp"
 #include "dnd.hpp"
 #include "pipe_command.hpp"
-#include "rotate.hpp"
+#include "rotate_box.hpp"
 #include "mkvextract.hpp"
 
 
@@ -73,7 +73,7 @@ void MKVextract::run_mkvextract()
     m_but_abort->activate();
     m_but_abort->show();
 
-    m_rotate->activate();
+    m_rotate->start();
 
     Fl::unlock();
     Fl::awake();

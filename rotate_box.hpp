@@ -24,29 +24,30 @@
 
 #pragma once
 
+#include <FL/Fl.H>
+#include <FL/Fl_Box.H>
 #include <vector>
 
-class Fl_Box;
 class Fl_SVG_Image;
 
 
-class rotate
+class rotate_box : public Fl_Box
 {
 private:
 
+    bool m_running = false;
     std::vector<Fl_SVG_Image *> m_array;
     std::vector<Fl_SVG_Image *>::iterator m_frame;
-    Fl_Box *m_box;
 
     static void next_frame_cb(void *p);
     void do_next_frame();
 
 public:
 
-    rotate(Fl_Box *o);
-    ~rotate();
+    rotate_box(int X, int Y, int W, int H);
+    virtual ~rotate_box();
 
-    void activate();
-    void deactivate();
+    void start();
+    void stop();
 };
 

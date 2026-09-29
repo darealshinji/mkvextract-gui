@@ -40,7 +40,7 @@ class Fl_Widget;
 class check_browser;
 class dnd_box;
 class posix_thread;
-class rotate;
+class rotate_box;
 
 
 class MKVextract
@@ -69,7 +69,6 @@ private:
     /* these objects must be deleted in the d'tor */
     posix_thread *m_th_info;
     posix_thread *m_th_extract;
-    rotate *m_rotate;
     Fl_Double_Window *m_win;
     Fl_Double_Window *m_cmd;
     Fl_Text_Buffer *m_txtbuf;
@@ -80,6 +79,7 @@ private:
     /* widgets (automatically deleted) */
     check_browser *m_browser;
     dnd_box *m_dnd_area;
+    rotate_box *m_rotate;
     Fl_Button *m_but_outdir;
     Fl_Button *m_but_add;
     Fl_Button *m_but_extract;
@@ -129,9 +129,7 @@ public:
     auto_free(void *ptr) : m_ptr(ptr)
     {}
 
-    ~auto_free()
-    {
-        //puts(__PRETTY_FUNCTION__);
+    ~auto_free() {
         free(m_ptr);
     }
 };
