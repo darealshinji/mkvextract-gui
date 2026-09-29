@@ -31,6 +31,7 @@
 #include <FL/Fl_Check_Button.H>
 #include <FL/fl_ask.H>
 #include <string>
+#include <string_view>
 
 #include "check_browser.hpp"
 #include "dnd.hpp"
@@ -43,6 +44,7 @@ void MKVextract::run_mkvextract()
 {
     std::string base, xml, ogm;
 
+    /* check for command */
     if (!command_in_path("mkvextract")) {
         Fl::lock();
 
@@ -75,6 +77,7 @@ void MKVextract::run_mkvextract()
     Fl::unlock();
     Fl::awake();
 
+    /* create pipe */
     pipe_command cmd(m_args);
     FILE *fp = cmd.pipe_open();
 
@@ -87,18 +90,21 @@ void MKVextract::run_mkvextract()
         return;
     }
 
+    /* read lines */
+    constexpr std::string_view prog{"#GUI#progress "};
+    constexpr std::string_view err{"#GUI#error "};
     size_t n = 0;
     char *buf = NULL;
     auto_free af(buf);
 
     while (getline(&buf, &n, fp) != -1) {
-        if (strncmp(buf, "#GUI#progress ", 14) == 0) {
+        if (strncmp(buf, prog.data(), prog.size()) == 0) {
             Fl::lock();
-            m_progress_box->copy_label(buf + 14); /* trailing newline is ignored */
+            m_progress_box->copy_label(buf + prog.size());
             Fl::unlock();
             Fl::awake();
-        } else if (strncmp(buf, "#GUI#error ", 11) == 0) {
-            std::string msg = buf + 11;
+        } else if (strncmp(buf, err.data(), err.size()) == 0) {
+            std::string msg = buf + err.size();
             fold_text(msg);
 
             Fl::lock();
