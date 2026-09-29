@@ -40,6 +40,7 @@ private:
     start_routine_t m_fn;
     void *m_data;
 
+
 public:
 
     posix_thread(start_routine_t fn, void *data = NULL)
@@ -52,9 +53,9 @@ public:
 
     void start()
     {
-        cancel();
-
-        if (pthread_create(&m_thread, NULL, m_fn, m_data) == 0) {
+        if (!m_running && m_fn &&
+            pthread_create(&m_thread, NULL, m_fn, m_data) == 0)
+        {
             m_running = true;
         }
     }

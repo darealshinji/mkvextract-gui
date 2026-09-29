@@ -60,6 +60,7 @@ void rotate::next_frame_cb(void *p) {
     reinterpret_cast<rotate *>(p)->do_next_frame();
 }
 
+
 void rotate::do_next_frame()
 {
     if (++m_frame == m_array.end()) {

@@ -245,7 +245,7 @@ MKVextract::MKVextract()
     const int bt_h = 28;
     const int bt_w = 110;
     const int center_align = FL_ALIGN_CENTER | FL_ALIGN_INSIDE | FL_ALIGN_CLIP;
-    const int left_align = FL_ALIGN_LEFT | FL_ALIGN_INSIDE | FL_ALIGN_CLIP;
+    const int left_align   = FL_ALIGN_LEFT   | FL_ALIGN_INSIDE | FL_ALIGN_CLIP;
     int x, y, w, h;
 
 
@@ -274,7 +274,7 @@ MKVextract::MKVextract()
     FcInit();
 
 
-    /* use mkvextract icon if present */
+    /* use system-wide installed icon if present */
     const std::array<const char *, 6> paths = {
         "/usr/share/icons/hicolor/256x256/apps/mkvextract.png",
         "/usr/share/icons/hicolor/128x128/apps/mkvextract.png",
@@ -415,8 +415,7 @@ MKVextract::MKVextract()
         y = m_but_add->y() + m_but_add->h() + 5;
         w = m_win->w() - 20;
         h = m_win->h() - bt_h*3 - 35;
-        m_browser = new check_browser(10, y, w, h);
-        m_browser->menu(menu);
+        m_browser = new check_browser(menu, 10, y, w, h);
         METHODCB(m_browser, this, do_update_browser);
 
         /* drag 'n drop area */

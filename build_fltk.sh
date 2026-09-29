@@ -6,6 +6,10 @@ if [ ! -e fltk ]; then
     git clone https://github.com/fltk/fltk
 fi
 
+if [ -e fltk/build/usr/bin/fltk-config ]; then
+    exit 0
+fi
+
 rm -rf fltk/build
 mkdir -p fltk/build
 cd fltk/build

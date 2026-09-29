@@ -24,7 +24,6 @@
 
 #pragma once
 
-#include <stddef.h>
 #include <FL/Fl.H>
 #include <FL/Fl_Check_Browser.H>
 #include <FL/Fl_Menu_Item.H>
@@ -32,30 +31,9 @@
 
 class check_browser : public Fl_Check_Browser
 {
-    Fl_Menu_Item *m_menu = NULL;
+private:
 
-public:
-    check_browser(int X, int Y, int W, int H, const char *L=NULL)
-    : Fl_Check_Browser(X, Y, W, H, L)
-    {
-        box(FL_THIN_DOWN_BOX);
-        color(fl_lighter(fl_lighter(FL_BACKGROUND_COLOR)));
-        when(FL_WHEN_CHANGED);
-    }
-
-    ~check_browser() {
-        Fl_Check_Browser::clear();
-    }
-
-    void menu(Fl_Menu_Item *m) {
-        m_menu = m;
-    }
-
-    Fl_Menu_Item *menu() const {
-        return m_menu;
-    }
-
-protected:
+    Fl_Menu_Item *m_menu;
 
     int handle(int event)
     {
@@ -68,6 +46,26 @@ protected:
         }
 
         return Fl_Check_Browser::handle(event);
+    }
+
+
+public:
+
+    check_browser(Fl_Menu_Item *m, int X, int Y, int W, int H)
+    : Fl_Check_Browser(X, Y, W, H)
+    {
+        m_menu = m;
+        box(FL_THIN_DOWN_BOX);
+        color(fl_lighter(fl_lighter(FL_BACKGROUND_COLOR)));
+        when(FL_WHEN_CHANGED);
+    }
+
+    ~check_browser() {
+        Fl_Check_Browser::clear();
+    }
+
+    Fl_Menu_Item *menu() const {
+        return m_menu;
     }
 };
 

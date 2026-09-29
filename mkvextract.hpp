@@ -68,11 +68,16 @@ private:
     bool parse_mkvinfo(std::string &error);
 
 
-    /* windows */
+    /* these objects must be deleted in the d'tor */
     Fl_Double_Window *m_win;
     Fl_Double_Window *m_cmd;
+    Fl_Text_Buffer *m_txtbuf;
+    Fl_Native_File_Chooser *m_fcdir;
+    Fl_Native_File_Chooser *m_fcfile;
+    rotate *m_rotate;
 
-    /* widgets */
+
+    /* widgets (automatically deleted) */
     check_browser *m_browser;
     dnd_box *m_dnd_area;
     Fl_Button *m_but_outdir;
@@ -80,18 +85,13 @@ private:
     Fl_Button *m_but_extract;
     Fl_Button *m_but_abort;
     Fl_Button *m_but_cmd;
+    Fl_Check_Button *m_use_source_path;
     Fl_Box *m_progress_box;
     Fl_Box *m_outdir_field;
     Fl_Box *m_infile_label;
-    Fl_Check_Button *m_use_source_path;
-
-    /* other objects */
-    Fl_Native_File_Chooser *m_fcdir;
-    Fl_Native_File_Chooser *m_fcfile;
-    Fl_Text_Buffer *m_txtbuf;
-    rotate *m_rotate;
 
 
+    /* actions used by callbacks */
     void do_abort();
     void do_add();
     void do_browse_outdir();
@@ -120,14 +120,13 @@ public:
 
 
 /* very simple auto_ptr-like class */
-template<typename T>
 class auto_free
 {
 private:
-    T m_ptr;
+    void *m_ptr;
 
 public:
-    auto_free(T ptr) : m_ptr(ptr)
+    auto_free(void *ptr) : m_ptr(ptr)
     {}
 
     ~auto_free()

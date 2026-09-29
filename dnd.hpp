@@ -30,13 +30,7 @@
 
 class dnd_box : public Fl_Box
 {
-public:
-    dnd_box(int X, int Y, int W, int H)
-    : Fl_Box(X, Y, W, H)
-    {}
-
-    ~dnd_box()
-    {}
+private:
 
     int handle(int event)
     {
@@ -57,5 +51,15 @@ public:
 
         return rv;
     }
+
+
+public:
+
+    dnd_box(int X, int Y, int W, int H)
+    : Fl_Box(X, Y, W, H)
+    {}
+
+    ~dnd_box()
+    {}
 };
 
