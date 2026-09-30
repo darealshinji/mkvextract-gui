@@ -178,20 +178,19 @@ void MKVextract::run_mkvinfo()
 
     Fl::lock();
 
-    /* activate "Select ..." menu entries */
-    auto menu = m_browser->menu();
-    menu->activate();
-    menu->next()->activate();
-
     /* update widgets */
+
+    m_browser->menu()->activate(); /* "Select all" */
+    m_browser->menu()->next()->deactivate(); /* "Select none" */
+
     m_infile_label->copy_label(m_file.c_str());
     m_infile_label->activate();
+
     m_use_source_path->activate();
     m_dnd_area->activate();
     m_but_add->activate();
-    m_but_extract->deactivate();
-    m_but_cmd->deactivate();
-    m_progress_box->label(NULL);
+
+    do_update_browser();
     do_check_outdir();
 
     Fl::unlock();

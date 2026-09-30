@@ -51,6 +51,10 @@ private:
     static constexpr int m_btH = 28;
     static constexpr int m_btW = 110;
 
+    /* initial command line window dimensions */
+    static constexpr int m_cmdW = 640;
+    static constexpr int m_cmdH = 320;
+
     /* entry order in browser is tracks-->attachments-->timestamps-->chapters-->tags */
     size_t m_track_count = 0;
     size_t m_attach_count = 0;
