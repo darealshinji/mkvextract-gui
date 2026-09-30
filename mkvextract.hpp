@@ -47,6 +47,10 @@ class MKVextract
 {
 private:
 
+    /* common button width and height */
+    static constexpr int m_btH = 28;
+    static constexpr int m_btW = 110;
+
     /* entry order in browser is tracks-->attachments-->timestamps-->chapters-->tags */
     size_t m_track_count = 0;
     size_t m_attach_count = 0;
@@ -108,6 +112,8 @@ private:
 
     std::string create_cmd(bool extract);
     void restore_main_window();
+    void init_main_window();
+    void init_cmd_window();
 
 
 public:

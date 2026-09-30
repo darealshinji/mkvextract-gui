@@ -22,7 +22,13 @@
  SOFTWARE.
 **/
 
+#include <fontconfig/fontconfig.h>
+
 #include <FL/Fl.H>
+#include <FL/Fl_Double_Window.H>
+#include <FL/Fl_PNG_Image.H>
+
+#include <array>
 #include <iostream>
 #include <string.h>
 
@@ -30,9 +36,31 @@
 #include "version.h"
 
 
-
-static void print_fltk_version()
+static void set_default_icon()
 {
+    const std::array<const char *, 6> paths = {
+        "/usr/share/icons/hicolor/256x256/apps/mkvextract.png",
+        "/usr/share/icons/hicolor/128x128/apps/mkvextract.png",
+        "/usr/share/icons/hicolor/64x64/apps/mkvextract.png",
+        "/usr/share/icons/hicolor/48x48/apps/mkvextract.png",
+        "/usr/share/icons/hicolor/32x32/apps/mkvextract.png",
+        "/usr/share/pixmaps/mkvextract.png"
+    };
+
+    for (auto &e : paths) {
+        Fl_PNG_Image icon(e);
+
+        if (!icon.fail()) {
+            Fl_Double_Window::default_icon(&icon);
+            break;
+        }
+    }
+}
+
+
+static void print_infos()
+{
+    std::cout << "https://github.com/darealshinji/mkvextract-gui\n";
     std::cout << "using FLTK ";
 
 #ifdef FLTK_VERSION
@@ -56,9 +84,15 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    std::cout << "https://github.com/darealshinji/mkvextract-gui\n";
-    print_fltk_version();
+    print_infos();
 
+    /* init fontconfig */
+    FcInit();
+
+    /* use system-wide installed icon if present */
+    set_default_icon();
+
+    /* show window */
     MKVextract ex(argc > 1 ? argv[1] : NULL);
     ex.show();
 
