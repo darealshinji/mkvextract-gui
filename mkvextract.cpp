@@ -58,7 +58,7 @@
 /* inline lambda start routine for pthread_create() */
 #define PTHREADCB(METHOD) \
     [] (void *p) -> void* { \
-        reinterpret_cast<MKVextract *>(p)->METHOD(); \
+        reinterpret_cast<decltype(this)>(p)->METHOD(); \
         return NULL; \
     }
 
@@ -66,23 +66,18 @@
 /* inline lambda callback function for Fl_Menu_Item */
 #define MENUCB(METHOD) \
     [] (Fl_Widget *, void *p) { \
-        reinterpret_cast<MKVextract *>(p)->METHOD(); \
+        reinterpret_cast<decltype(this)>(p)->METHOD(); \
     }
 
 
 /* generate callback function and set callback */
-#define XCONCAT(x, y)  x##y
-#define CONCAT(x, y)   XCONCAT(x, y)
-#define CALLBACK_NAME  CONCAT(method_callback_, __LINE__)
-
 #define METHODCB(WIDGET, OBJECT, METHOD) \
     do { \
-        static auto CALLBACK_NAME = [] (Fl_Widget *, void *p) { \
+        static auto callback_function = [] (Fl_Widget *, void *p) { \
             reinterpret_cast<decltype(OBJECT)>(p)->METHOD(); \
         }; \
-        WIDGET->callback(CALLBACK_NAME, OBJECT); \
+        WIDGET->callback(callback_function, OBJECT); \
     } while (0)
-
 
 
 void MKVextract::restore_main_window()
@@ -253,7 +248,7 @@ void MKVextract::do_select_none()
 
 
 /* c'tor */
-MKVextract::MKVextract()
+MKVextract::MKVextract(const char *file)
 {
     const int bt_h = 28;
     const int bt_w = 110;
@@ -266,6 +261,12 @@ MKVextract::MKVextract()
         o->position((Fl::w() - o->decorated_w()) / 2,
                     (Fl::h() - o->decorated_h()) / 2);
     };
+
+
+    /* set input file */
+    if (file && *file) {
+        m_file = fl_filename_absolute_str(file);
+    }
 
 
     /* set destination to current working directory */
@@ -297,7 +298,7 @@ MKVextract::MKVextract()
         "/usr/share/pixmaps/mkvextract.png"
     };
 
-    for (const char *e : paths) {
+    for (auto e : paths) {
         Fl_PNG_Image icon(e);
 
         if (!icon.fail()) {
@@ -512,7 +513,7 @@ MKVextract::~MKVextract()
 }
 
 
-void MKVextract::show(const char *file)
+void MKVextract::show()
 {
     if (m_win->shown()) {
         return;
@@ -522,18 +523,6 @@ void MKVextract::show(const char *file)
 
     /* test timeout handler */
     //m_rotate->start();
-
-    if (file && *file) {
-        if (fl_filename_isdir(file)) {
-            fl_message_title("Error");
-            fl_message("`%s' is a directory!", file);
-        } else if (access(file, R_OK) != 0) {
-            fl_message_title("Error");
-            fl_message("cannot read file `%s'", file);
-        } else {
-            m_file = fl_filename_absolute_str(file);
-        }
-    }
 
     Fl::lock();
 

@@ -112,10 +112,10 @@ private:
 
 public:
 
-    MKVextract();
+    MKVextract(const char *file);
     ~MKVextract();
 
-    void show(const char *file);
+    void show();
 };
 
 

@@ -32,7 +32,6 @@
 
 #include "rotate_box.hpp"
 
-#define TIMEOUT_SPEED 0.1 /* seconds */
 
 
 static const char *svg_template =
@@ -70,7 +69,7 @@ void rotate_box::do_next_frame()
     image(*m_frame);
     parent()->redraw();
 
-    Fl::repeat_timeout(TIMEOUT_SPEED, next_frame_cb, this);
+    Fl::repeat_timeout(m_time, next_frame_cb, this);
 }
 
 
@@ -79,28 +78,32 @@ rotate_box::rotate_box(int X, int Y, int W, int H)
 {
     std::string copy;
 
+    /* number of images to generate */
+    const int size = 8;
+
     /* color values */
     const char *col = "59d00000" "59d00000";
-    const char *p = col + 8;   /* ^ here */
+    const char *p = col+size;  /* ^ here */
+
+    m_array.reserve(size);
 
     /* save icons in array; decreasing the pointer "p"
      * makes the color values shift/rotate to the right */
-    for (size_t i = 0; i < 8; ++i, --p) {
+    for (int i = 0; i < size; ++i, --p) {
         size_t pos = 0;
         copy = svg_template;
 
         /* insert color values */
-        for (size_t j = 0; j < 8; ++j) {
+        for (int j = 0; j < size; ++j) {
             if (find_at_pos(copy, "@@@", pos)) {
                 copy.replace(pos, 3, 3, p[j]);
                 //putchar(p[j]);
             }
         }
 
-        //putchar('\n');
-
         m_array.push_back(new Fl_SVG_Image(NULL, copy.c_str()));
         m_array.back()->resize(W, H);
+        //putchar('\n');
     }
 }
 
@@ -125,7 +128,7 @@ void rotate_box::start()
     m_frame = m_array.begin();
     image(*m_frame);
 
-    Fl::add_timeout(TIMEOUT_SPEED, next_frame_cb, this);
+    Fl::add_timeout(m_time, next_frame_cb, this);
     m_running = true;
 }
 
