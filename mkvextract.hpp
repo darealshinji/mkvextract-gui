@@ -97,16 +97,16 @@ private:
 
     /* actions used by callbacks */
     void do_abort();
-    void do_add();
-    void do_browse_outdir();
     void do_check_outdir();
-    void do_clipboard();
-    void do_close();
     void do_cmd();
+    void do_copy_command();
     void do_dnd();
     void do_extract();
+    void do_open_file();
+    void do_quit();
     void do_select_all();
     void do_select_none();
+    void do_set_outdir();
     void do_update_browser();
 
 

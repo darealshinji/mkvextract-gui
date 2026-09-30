@@ -24,6 +24,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #include <FL/Fl.H>
@@ -101,32 +102,44 @@ void MKVextract::restore_main_window()
 
 void MKVextract::do_dnd()
 {
-    std::string items(Fl::event_text());
-    size_t pos = items.find('\n');
+    const char *text = Fl::event_text();
 
-    if (pos == std::string::npos) {
+    /* unlikely but it doesn't hurt to check */
+    if (!text || !*text) {
         return;
     }
 
-    items.erase(pos);
+    /* find newline separator */
+    const char *p = strchr(text, '\n');
 
-    if (items.starts_with("file:///")) { /* URI */
-        items.erase(0, 7);
-        fl_decode_uri(std::data(items));
-    } else if (!items.starts_with('/')) {
+    if (!p) {
         return;
     }
 
-    /* stop running threads */
+    /* copy first item, without newline */
+    std::string s(text, p - text);
+
+    if (s.starts_with("file://")) {
+        /* decode URI in place */
+        s.erase(0, 7);
+        fl_decode_uri(std::data(s));
+    }
+
+    if (!s.starts_with('/')) {
+        /* not a full path */
+        return;
+    }
+
+    /* stop threads */
     m_th_extract->cancel();
     m_th_info->cancel();
 
-    m_file = std::move(items);
+    m_file = std::move(s);
     m_th_info->start();
 }
 
 
-void MKVextract::do_browse_outdir()
+void MKVextract::do_set_outdir()
 {
     const char *p;
 
@@ -139,14 +152,14 @@ void MKVextract::do_browse_outdir()
             m_outdir_manual += '/';
         }
 
-        m_outdir_field->copy_label(m_outdir_manual.c_str());
+        m_outdir_field->label(m_outdir_manual.c_str());
         m_outdir_field->activate();
         m_use_source_path->clear();
     }
 }
 
 
-void MKVextract::do_add()
+void MKVextract::do_open_file()
 {
     const char *p;
 
@@ -164,18 +177,15 @@ void MKVextract::do_add()
 }
 
 
-void MKVextract::do_clipboard()
+void MKVextract::do_copy_command()
 {
-    char *text = m_txtbuf->text();
-    Fl::copy(text, m_txtbuf->length(), 1);
-    free(text);
+    Fl::copy(m_txtbuf->text_str().c_str(), m_txtbuf->length(), 1);
 }
 
 
 void MKVextract::do_cmd()
 {
-    std::string command = create_cmd(false);
-    m_txtbuf->text(command.c_str());
+    m_txtbuf->text(create_cmd(false).c_str());
     m_cmd->show();
 }
 
@@ -205,10 +215,10 @@ void MKVextract::do_abort()
 void MKVextract::do_check_outdir()
 {
     if (m_use_source_path->value() == true) {
-        m_outdir_field->copy_label(m_outdir_source.c_str());
+        m_outdir_field->label(m_outdir_source.c_str());
         m_outdir_field->deactivate();
     } else {
-        m_outdir_field->copy_label(m_outdir_manual.c_str());
+        m_outdir_field->label(m_outdir_manual.c_str());
         m_outdir_field->activate();
     }
 }
@@ -228,7 +238,7 @@ void MKVextract::do_update_browser()
 }
 
 
-void MKVextract::do_close()
+void MKVextract::do_quit()
 {
     m_th_extract->cancel();
     m_th_info->cancel();
@@ -259,13 +269,13 @@ void MKVextract::init_main_window()
     static Fl_Menu_Item menu[] = {
         {"Select all",  0, MENUCB(do_select_all),  this, FL_MENU_INACTIVE},
         {"Select none", 0, MENUCB(do_select_none), this, FL_MENU_INACTIVE|FL_MENU_DIVIDER},
-        {"Open file",   0, MENUCB(do_add),         this},
-        {"Quit",        0, MENUCB(do_close),       this},
+        {"Open file",   0, MENUCB(do_open_file),   this},
+        {"Quit",        0, MENUCB(do_quit),        this},
         {0}
     };
 
     m_win = new Fl_Double_Window(800, 480, "simple mkvextract GUI");
-    METHODCB(m_win, this, do_close);
+    METHODCB(m_win, this, do_quit);
 
         /* upper area group */
         h = m_btH + 5;
@@ -274,7 +284,7 @@ void MKVextract::init_main_window()
             /* "Open file" button */
             x = m_win->w() - 10 - m_btW;
             m_but_add = new Fl_Button(x, 5, m_btW, m_btH, "Open file");
-            METHODCB(m_but_add, this, do_add);
+            METHODCB(m_but_add, this, do_open_file);
 
             /* input file label */
             w = m_but_add->x() - 20;
@@ -363,7 +373,7 @@ void MKVextract::init_main_window()
             x = m_but_cmd->x();
             y = m_use_source_path->y();
             m_but_outdir = new Fl_Button(x, y, m_btW, m_btH, "Destination");
-            METHODCB(m_but_outdir, this, do_browse_outdir);
+            METHODCB(m_but_outdir, this, do_set_outdir);
 
         g_bttm->end();
         g_bttm->resizable(g_outd);
@@ -405,25 +415,19 @@ void MKVextract::init_cmd_window()
         auto g_bttn = new Fl_Group(0, y, w, h);
         g_bttn->begin();
 
-            /* "Close" button */
+            /* "Copy" button */
             x = m_cmd->w() - 110 - 15;
             y = txt->h() + txt->y() + 6;
-            auto btclose = new Fl_Button(x, y, 110, m_btH, "Close");
-            METHODCB(btclose, m_cmd, hide);
-
-            /* "Copy to clipboard" button */
-            x = btclose->x() - 150 - 5;
-            y = btclose->y();
-            auto btcopy = new Fl_Button(x, y, 150, m_btH, "Copy to clipboard");
-            METHODCB(btcopy, this, do_clipboard);
+            auto btcopy = new Fl_Button(x, y, 110, m_btH, "Copy");
+            METHODCB(btcopy, this, do_copy_command);
 
             /* dummy */
             x = btcopy->x() - 1;
             y = btcopy->y();
-            auto dummy2 = new Fl_Box(FL_NO_BOX, x, y, 1, 1, NULL);
+            auto dummy = new Fl_Box(FL_NO_BOX, x, y, 1, 1, NULL);
 
         g_bttn->end();
-        g_bttn->resizable(dummy2);
+        g_bttn->resizable(dummy);
 
     m_cmd->end();
     m_cmd->resizable(txt);

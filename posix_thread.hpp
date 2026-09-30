@@ -47,11 +47,8 @@ public:
     : m_fn(fn), m_data(data)
     {}
 
-    ~posix_thread()
-    {
-        if (m_running) {
-            pthread_cancel(m_thread);
-        }
+    ~posix_thread() {
+        cancel();
     }
 
     void start()
