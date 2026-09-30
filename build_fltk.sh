@@ -4,6 +4,14 @@ set -x
 
 if [ ! -e fltk ]; then
     git clone https://github.com/fltk/fltk
+    cd fltk
+
+    VERSION=$(cat "fltk_version.dat")
+    GIT_HASH=$(git rev-parse --short HEAD)
+    echo "#pragma once" > ../version.h
+    echo "#define FLTK_VERSION \"${VERSION} (git snapshot ${GIT_HASH})\"" >> ../version.h
+
+    cd ..
 fi
 
 if [ -e fltk/build/usr/bin/fltk-config ]; then

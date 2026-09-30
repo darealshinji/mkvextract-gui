@@ -33,7 +33,12 @@
 #include <string.h>
 
 #include "mkvextract.hpp"
-#include "version.h"
+
+#if !defined(FLTK_VERSION) && defined(__has_include)
+# if __has_include("version.h")
+#  include "version.h"
+# endif
+#endif
 
 
 static void set_default_icon()

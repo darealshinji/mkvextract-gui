@@ -43,16 +43,11 @@ LIBS += $(shell $(PKG_CONFIG) --libs fontconfig 2>/dev/null)
 all: $(BIN)
 
 clean:
-	-rm -f version.h $(BIN) $(OBJS)
+	-rm -f $(BIN) $(OBJS)
 
 distclean: clean
 	-rm -rf fltk/build/
 
 $(BIN): $(OBJS)
 	$(CXX) -o $@ $^ $(LDFLAGS) $(LIBS)
-
-main.cpp: version.h
-
-version.h:
-	sh ./fltk-version.sh > $@
 
