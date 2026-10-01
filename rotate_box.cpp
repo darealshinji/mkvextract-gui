@@ -60,6 +60,7 @@ void rotate_box::next_frame_cb(void *p) {
 }
 
 
+/* iterate through frames */
 void rotate_box::do_next_frame()
 {
     if (++m_frame == m_array.end()) {

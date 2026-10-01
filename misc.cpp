@@ -35,7 +35,7 @@ namespace fs = std::filesystem;
 /* fold text before using it on fl_message() */
 void fold_text(std::string &text)
 {
-    const unsigned max = 80;
+    const size_t max = 80;
     size_t n = 0;
 
     if (text.size() <= max) {

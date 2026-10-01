@@ -54,7 +54,7 @@ enum {
 /* convert a byte into a printable escaped hex digit sequence, i.e. \x1B */
 static const char *uchar_to_hex(unsigned char c)
 {
-    static char buf[8];
+    static char buf[5];
     const char *digits = "0123456789ABCDEF";
 
     buf[0] = '\\';

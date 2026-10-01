@@ -40,11 +40,7 @@ std::string MKVextract::create_cmd(bool extract)
     m_args.clear();
 
     if (extract) {
-        m_args.push_back("mkvextract");
-        m_args.push_back(m_file);
-        m_args.push_back("--ui-language");
-        m_args.push_back("en_US");
-        m_args.push_back("--gui-mode");
+        m_args = { "mkvextract", m_file, "--ui-language", "en_US", "--gui-mode" };
     } else {
         command = "mkvextract " + quote_filename(m_file);
     }

@@ -115,6 +115,7 @@ static std::string save_chapter_entry(tinyxml2::XMLElement *atom, const char *ti
     char buf_num[32];
     char buf_time[64];
 
+    /* read time values */
     const std::regex reg("^([0-9]+):([0-9]+):([0-9]+)(\\.[0-9]+)?");
 
     if (!std::regex_match(time, match, reg) || match.size() != 5) {
@@ -129,7 +130,8 @@ static std::string save_chapter_entry(tinyxml2::XMLElement *atom, const char *ti
         return {};
     }
 
-    /* milliseconds with exactly three digits */
+    /* save milliseconds with exactly three digits;
+     * do not round, simply cut the string if it's too long */
     std::string ms = match.str(4);
 
     if (ms.empty()) {
@@ -145,7 +147,7 @@ static std::string save_chapter_entry(tinyxml2::XMLElement *atom, const char *ti
 
     const char *name = get_chapter_name(atom);
 
-    /* OGM format chapter entry */
+    /* create OGM format chapter entry */
     strm << "CHAPTER" << buf_num << '=' << buf_time << ms << '\n';
     strm << "CHAPTER" << buf_num << "NAME=";
 

@@ -28,7 +28,7 @@
 #include <pthread.h>
 
 
-/* simple wrapper class for pthread, as an alternative for std::thread */
+/* simple wrapper class for pthread */
 class posix_thread
 {
 public:
@@ -53,6 +53,7 @@ public:
 
     void start()
     {
+        /* don't do anything if a thread is still running */
         if (!m_running && m_fn &&
             pthread_create(&m_thread, NULL, m_fn, m_data) == 0)
         {

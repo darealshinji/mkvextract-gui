@@ -84,6 +84,7 @@ void MKVextract::restore_main_window()
 
     m_but_abort->deactivate();
     m_but_abort->hide();
+
     m_but_extract->activate();
     m_but_extract->show();
 
@@ -127,6 +128,7 @@ void MKVextract::do_dnd()
     m_th_extract->cancel();
     m_th_info->cancel();
 
+    /* get file infos */
     m_file = std::move(str);
     m_th_info->start();
 }
@@ -160,10 +162,11 @@ void MKVextract::do_open_file()
     m_fcfile->filter("*.mkv|*.mka|*.mks|*.mk3d|*.webm"); /* see https://www.matroska.org */
 
     if (m_fcfile->show() == 0 && (p = m_fcfile->filename()) != NULL && *p != 0) {
-        /* stop running threads */
+        /* stop threads */
         m_th_extract->cancel();
         m_th_info->cancel();
 
+        /* get file infos */
         m_file = p;
         m_th_info->start();
     }
@@ -176,6 +179,7 @@ void MKVextract::do_copy_command()
     const int len = m_txtbuf->length();
     const int destination = 1; /* 0 = selection, 1 = clipboard, 2 = both */
 
+    /* copy entire text to clipboard */
     Fl::copy(str.c_str(), len, destination);
 }
 
@@ -186,7 +190,7 @@ void MKVextract::do_cmd()
     std::string str = create_cmd(false);
     m_txtbuf->text(str.c_str());
 
-    /* resize window to default size and
+    /* resize window to default and
      * position at center above main window */
     int x = m_win->x() + ((m_win->w() - m_cmdW) / 2);
     int y = m_win->y() + ((m_win->h() - m_cmdH) / 2);
@@ -197,22 +201,27 @@ void MKVextract::do_cmd()
 
 void MKVextract::do_extract()
 {
-    /* stop running threads */
+    /* stop threads */
     m_th_extract->cancel();
     m_th_info->cancel();
 
+    /* close command line window */
     m_cmd->hide();
     m_win->redraw();
 
+    /* start extraction */
     m_th_extract->start();
 }
 
 
 void MKVextract::do_abort()
 {
+    /* stop threads */
     m_th_extract->cancel();
     m_th_info->cancel();
+
     m_progress_box->label("STOPPED");
+
     restore_main_window();
 }
 
@@ -220,9 +229,11 @@ void MKVextract::do_abort()
 void MKVextract::do_check_outdir()
 {
     if (m_use_source_path->value() == true) {
+        /* same as input file directory */
         m_outdir_field->label(m_outdir_source.c_str());
         m_outdir_field->deactivate();
     } else {
+        /* manually selected output directory */
         m_outdir_field->label(m_outdir_manual.c_str());
         m_outdir_field->activate();
     }
@@ -257,6 +268,7 @@ void MKVextract::do_update_browser()
 
 void MKVextract::do_quit()
 {
+    /* stop threads and close all windows */
     m_th_extract->cancel();
     m_th_info->cancel();
     Fl::hide_all_windows();
@@ -292,6 +304,7 @@ void MKVextract::init_main_window()
     };
 
 
+    /* main window */
     w = 800;
     h = 480;
     m_win = new Fl_Double_Window(w, h, "simple mkvextract GUI");
@@ -422,7 +435,7 @@ void MKVextract::init_main_window()
         g_bttm->end();
         g_bttm->resizable(m_outdir_field);
 
-        /* check browser */
+        /* check browser between the two main groups */
         x = 10;
         y = g_up->y() + g_up->h();
         w = m_win->w() - 20;
@@ -430,7 +443,7 @@ void MKVextract::init_main_window()
         m_browser = new check_browser(menu, x, y, w, h);
         METHODCB(m_browser, do_update_browser);
 
-        /* drag 'n drop area */
+        /* drag 'n drop area covering entire window */
         x = 0;
         y = 0;
         w = m_win->w();
@@ -456,6 +469,10 @@ void MKVextract::init_cmd_window()
 {
     int x, y, w, h;
 
+    /* text buffer */
+    m_txtbuf = new Fl_Text_Buffer();
+
+    /* command line window */
     w = m_cmdW;
     h = m_cmdH;
     m_cmd = new Fl_Double_Window(w, h, "Command line");
@@ -467,6 +484,7 @@ void MKVextract::init_cmd_window()
         h = m_cmd->h() - 20 - m_btH;
         auto txt = new Fl_Text_Display(x, y, w, h);
         txt->wrap_mode(Fl_Text_Display::WRAP_AT_BOUNDS, 2);
+        txt->buffer(m_txtbuf);
 
         /* button group */
         x = 0;
@@ -499,10 +517,6 @@ void MKVextract::init_cmd_window()
     w = m_cmd->w() / 2;
     h = m_cmd->h() / 2;
     m_cmd->size_range(w, h, Fl::w(), Fl::h());
-
-    /* text buffer */
-    m_txtbuf = new Fl_Text_Buffer();
-    txt->buffer(m_txtbuf);
 }
 
 
@@ -527,13 +541,11 @@ MKVextract::MKVextract(const char *file)
     m_th_extract = new posix_thread (PTHREADCB(run_mkvextract), this);
     m_th_info = new posix_thread (PTHREADCB(run_mkvinfo), this);
 
-    /* main window */
+    /* init windows */
     init_main_window();
-
-    /* command line window */
     init_cmd_window();
 
-    /* file choosers */
+    /* native file choosers */
     m_fcdir = new Fl_Native_File_Chooser(Fl_Native_File_Chooser::BROWSE_DIRECTORY);
     m_fcfile = new Fl_Native_File_Chooser(Fl_Native_File_Chooser::BROWSE_FILE);
 

@@ -74,6 +74,8 @@ FILE *pipe_command::pipe_open(const std::vector<std::string> &argv)
 {
     std::vector<char*> vec;
 
+    vec.reserve(argv.size() + 1);
+
     for (auto &e : argv) {
         vec.push_back(const_cast<char *>(e.c_str()));
     }
