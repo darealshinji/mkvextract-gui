@@ -1,22 +1,25 @@
 BIN  = simple-mkvextract-gui
 
 OBJS = \
-	create_cmd.o \
-	main.o \
-	misc.o \
-	mkvextract.o \
-	pipe_command.o \
-	quote_filename.o \
-	rotate_box.o \
-	thread_mkvinfo.o \
-	thread_mkvextract.o \
-	xml2ogm.o \
+	src/create_cmd.o \
+	src/main.o \
+	src/misc.o \
+	src/mkvextract.o \
+	src/pipe_command.o \
+	src/quote_filename.o \
+	src/rotate_box.o \
+	src/thread_mkvinfo.o \
+	src/thread_mkvextract.o \
+	src/xml2ogm.o \
 	$(NULL)
 
 PKG_CONFIG ?= pkg-config
 CXXFLAGS   ?= -Wall -O3 -std=gnu++20
 LDFLAGS    ?= -Wl,--as-needed -Wl,--gc-sections -s
 LIBS       ?=
+
+# to find version.h
+CXXFLAGS += -I.
 
 # fltk
 FLTK_CONFIG ?= fltk/build/usr/bin/fltk-config
