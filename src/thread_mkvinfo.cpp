@@ -45,7 +45,6 @@
 #include "dnd.hpp"
 #include "pipe_command.hpp"
 #include "mkvextract.hpp"
-#include "codecs.h"
 
 
 struct track_info {
@@ -64,6 +63,16 @@ struct attachment_info {
     std::string size;
 };
 
+struct codec_specs {
+    const char *id;
+    const char *ext;
+};
+
+
+static struct codec_specs mkv_codec_list[] =
+{
+#include "codecs.i"
+};
 
 
 /* display attachment file sizes in Bytes, KiB, MiB or GiB */
