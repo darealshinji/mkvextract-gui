@@ -14,9 +14,12 @@ OBJS = \
 	$(NULL)
 
 PKG_CONFIG ?= pkg-config
-CXXFLAGS   ?= -Wall -O3 -std=gnu++20
+CXXFLAGS   ?= -Wall -O3
 LDFLAGS    ?= -Wl,--as-needed -Wl,--gc-sections -s
 LIBS       ?=
+
+STDCXX      ?= -std=gnu++20
+CXXFLAGS    += $(STDCXX)
 
 # to find version.h
 CXXFLAGS += -I.
@@ -39,8 +42,6 @@ else
 LIBS     += $(TINYXML2_LIBS)
 endif
 
-# fontconfig
-LIBS += $(shell $(PKG_CONFIG) --libs fontconfig 2>/dev/null)
 
 
 all: $(BIN)

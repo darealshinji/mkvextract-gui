@@ -22,8 +22,6 @@
  SOFTWARE.
 **/
 
-#include <fontconfig/fontconfig.h>
-
 #include <FL/Fl.H>
 #include <FL/Fl_Double_Window.H>
 #include <FL/Fl_PNG_Image.H>
@@ -90,14 +88,8 @@ int main(int argc, char *argv[])
     }
 
     print_infos();
-
-    /* init fontconfig */
-    FcInit();
-
-    /* use system-wide installed icon if present */
     set_default_icon();
 
-    /* show window */
     MKVextract ex(argc > 1 ? argv[1] : NULL);
     ex.show();
 

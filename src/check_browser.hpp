@@ -56,7 +56,7 @@ public:
     {
         m_menu = m;
         box(FL_THIN_DOWN_BOX);
-        color(fl_lighter(fl_lighter(FL_BACKGROUND_COLOR)));
+        color(fl_lighter(FL_BACKGROUND_COLOR));
         when(FL_WHEN_CHANGED);
     }
 

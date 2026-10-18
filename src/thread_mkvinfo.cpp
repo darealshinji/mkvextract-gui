@@ -78,11 +78,32 @@ static struct codec_specs mkv_codec_list[] =
 /* display attachment file sizes in Bytes, KiB, MiB or GiB */
 static std::string human_readable_size(std::string &line)
 {
-    const long kb = 1024;
-    const long mb = kb * 1024;
-    const long gb = mb * 1024;
+    long kb, mb, gb, size;
+    const char *unitK, *unitM, *unitG;
 
-    long size = atol(line.c_str());
+    const bool base10 = true;
+
+    if constexpr (base10) {
+        kb = 1000;
+        mb = 1000^2;
+        gb = 1000^3;
+        unitK = " KB";
+        unitM = " MB";
+        unitG = " GB";
+    } else {
+        kb = 1024;
+        mb = 1024^2;
+        gb = 1024^3;
+        unitK = " KiB";
+        unitM = " MiB";
+        unitG = " GiB";
+    }
+
+    try {
+        size = std::stol(line);
+    } catch(...) {
+        return line + " B";
+    }
 
     if (size >= kb) {
         const char *unit;
@@ -91,17 +112,16 @@ static std::string human_readable_size(std::string &line)
 
         if (size < mb) {
             d /= kb;
-            unit = " KiB";
+            unit = unitK;
         } else if (size < gb) {
             d /= mb;
-            unit = " MiB";
+            unit = unitM;
         } else {
             d /= gb;
-            unit = " GiB";
+            unit = unitG;
         }
 
         snprintf(buf, sizeof(buf), "%.1f", d);
-
         return std::string(buf) + unit;
     }
 
