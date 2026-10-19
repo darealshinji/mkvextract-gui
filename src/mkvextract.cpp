@@ -59,13 +59,6 @@ enum {
     /* initial command line window dimensions */
     CMD_W = 640,
     CMD_H = 320,
-
-    /* Fl_Native_File_Chooser */
-    FNFC_PICKED      =  0,
-    FNFC_CANCEL      =  1,
-    FNFC_ERROR       = -1,
-    FNFC_BROWSE_FILE = Fl_Native_File_Chooser::BROWSE_FILE,
-    FNFC_BROWSE_DIR  = Fl_Native_File_Chooser::BROWSE_DIRECTORY
 };
 
 
@@ -101,22 +94,18 @@ enum {
 
 
 
-static const char *file_chooser(int val, const char *title, const char *filter = NULL)
+static const char *file_chooser_pick(Fl_Native_File_Chooser &fnfc)
 {
-    const char *p = NULL;
-
-    Fl_Native_File_Chooser fnfc(val);
-    fnfc.title(title);
-
-    if (filter) {
-        fnfc.filter(filter);
-    }
+    enum {
+        FNFC_PICKED =  0,
+        FNFC_CANCEL =  1,
+        FNFC_ERROR  = -1
+    };
 
     switch (fnfc.show())
     {
     case FNFC_PICKED:
-        p = fnfc.filename();
-        break;
+        return fnfc.filename();
     case FNFC_ERROR:
         fl_message_title("Error");
         fl_alert("%s", fnfc.errmsg());
@@ -126,7 +115,7 @@ static const char *file_chooser(int val, const char *title, const char *filter =
         break;
     }
 
-    return (p && *p) ? p : NULL;
+    return NULL;
 }
 
 
@@ -188,13 +177,16 @@ void MKVextract::do_dnd()
 
 void MKVextract::do_set_outdir()
 {
-    const char *p = file_chooser(FNFC_BROWSE_DIR, "Select output directory");
+    Fl_Native_File_Chooser fnfc(Fl_Native_File_Chooser::BROWSE_DIRECTORY);
+    fnfc.title("Select output directory");
 
-    if (!p) {
+    const char *dir = file_chooser_pick(fnfc);
+
+    if (!dir || !*dir) {
         return;
     }
 
-    m_outdir_manual = p;
+    m_outdir_manual = dir;
 
     if (!m_outdir_manual.ends_with('/')) {
         m_outdir_manual += '/';
@@ -208,10 +200,13 @@ void MKVextract::do_set_outdir()
 
 void MKVextract::do_open_file()
 {
-    const char *filter = "*.mkv|*.mka|*.mks|*.mk3d|*.webm"; /* https://www.matroska.org */
-    const char *p = file_chooser(FNFC_BROWSE_FILE, "Select a file", filter);
+    Fl_Native_File_Chooser fnfc(Fl_Native_File_Chooser::BROWSE_FILE);
+    fnfc.title("Select a file");
+    fnfc.filter("Matroska\t*.mkv|*.mka|*.mks|*.mk3d|*.webm");
 
-    if (!p) {
+    const char *file = file_chooser_pick(fnfc);
+
+    if (!file || !*file) {
         return;
     }
 
@@ -220,7 +215,7 @@ void MKVextract::do_open_file()
     m_th_info->cancel();
 
     /* get file infos */
-    m_file = p;
+    m_file = file;
     m_th_info->start();
 }
 
