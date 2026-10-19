@@ -34,38 +34,29 @@ class check_browser : public Fl_Check_Browser
 private:
 
     Fl_Menu_Item *m_menu;
-
-    int handle(int event)
-    {
-        if (m_menu && event == FL_PUSH &&
-            Fl::event_button() == FL_RIGHT_MOUSE)
-        {
-            auto m = m_menu->popup(Fl::event_x(), Fl::event_y());
-            if (m) m->do_callback(NULL);
-            return 1;
-        }
-
-        return Fl_Check_Browser::handle(event);
-    }
-
+    int handle(int event);
 
 public:
 
-    check_browser(Fl_Menu_Item *m, int X, int Y, int W, int H)
-    : Fl_Check_Browser(X, Y, W, H)
-    {
-        m_menu = m;
-        box(FL_THIN_DOWN_BOX);
-        color(fl_lighter(FL_BACKGROUND_COLOR));
-        when(FL_WHEN_CHANGED);
+    check_browser(Fl_Menu_Item *m, int X, int Y, int W, int H);
+    virtual ~check_browser();
+
+    Fl_Menu_Item *menu() const { return m_menu; }
+
+    /* returns true if all items are checked */
+    bool checked_all() const {
+        return (nitems() > 0 && nchecked() == nitems());
     }
 
-    virtual ~check_browser() {
-        Fl_Check_Browser::clear();
+    /* implicit cast from size_t to int */
+    int checked(size_t item) {
+        return Fl_Check_Browser::checked(item);
     }
 
-    Fl_Menu_Item *menu() const {
-        return m_menu;
-    }
+    /* returns true if all items within a range are checked */
+    bool range_checked(size_t start, size_t end);
+
+    /* update text at index position */
+    void update_text(int index, const char *new_text);
 };
 

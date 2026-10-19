@@ -26,7 +26,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -34,6 +33,7 @@ class Fl_Box;
 class Fl_Button;
 class Fl_Check_Button;
 class Fl_Double_Window;
+struct Fl_Menu_Item;
 class Fl_Native_File_Chooser;
 class Fl_Text_Buffer;
 class Fl_Widget;
@@ -45,19 +45,29 @@ class rotate_box;
 
 class MKVextract
 {
+public:
+
+    typedef enum {
+        PFX_BINARY,
+        PFX_DECIMAL,
+        PFX_NONE
+    } byte_pfx_t;
+
+    struct attachment_info {
+        std::string name;
+        std::string size_bytes;
+        std::string size_binary;
+        std::string size_decimal;
+    };
+
 private:
 
-    /* common button width and height */
-    static constexpr int m_btH = 28;
-    static constexpr int m_btW = 110;
-
-    /* initial command line window dimensions */
-    static constexpr int m_cmdW = 640;
-    static constexpr int m_cmdH = 320;
+    byte_pfx_t m_prefixes = PFX_BINARY;
+    Fl_Menu_Item *m_submenu;
 
     /* entry order in browser is tracks-->attachments-->timestamps-->chapters-->tags */
     size_t m_track_count = 0;
-    size_t m_attach_count = 0;
+    std::vector<struct attachment_info> m_attach; /* count is m_attach.size() */
     size_t m_timestamps_entry = 0;
     size_t m_chapters_entry = 0;
     size_t m_tags_entry = 0;
@@ -110,11 +120,15 @@ private:
     void do_quit();
     void do_select_all();
     void do_select_none();
+    void do_select_attachments();
     void do_set_outdir();
     void do_update_browser();
+    void do_update_pfx(byte_pfx_t pfx);
 
 
     std::string create_cmd(bool extract);
+    std::string stem_path();
+
     void restore_main_window();
     void init_main_window();
     void init_cmd_window();
@@ -145,22 +159,11 @@ public:
 };
 
 
-static inline std::string file_stem(const std::string &path)
+namespace utils
 {
-    return std::filesystem::path(path).stem().string();
+    std::string quote_filename(const std::string &in);
+    void fold_text(std::string &text);
+    bool command_in_path(const char *command);
+    bool xml2ogm(const std::string &input, const std::string &output);
 }
-
-
-static inline std::string dir_name(const std::string &path)
-{
-    auto str = std::filesystem::path(path).parent_path().string();
-    if (!str.ends_with('/')) { str += '/'; }
-    return str;
-}
-
-
-std::string quote_filename(const std::string &in);
-void fold_text(std::string &text);
-bool command_in_path(const char *command);
-bool xml2ogm(const char *input, const char *output);
 

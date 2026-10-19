@@ -24,16 +24,37 @@
 
 #include <ctype.h>
 #include <stdlib.h>
+#include <FL/Fl.H>
+#include <FL/Fl_Check_Button.H>
 #include <filesystem>
 #include <string>
 #include <vector>
+
+#include "mkvextract.hpp"
 
 namespace fs = std::filesystem;
 
 
 
+/* output path + input file stem name */
+std::string MKVextract::stem_path()
+{
+    std::string path;
+
+    if (m_use_source_path->value() == true) {
+        path = m_outdir_source;
+    } else {
+        path = m_outdir_manual;
+    }
+
+    path += fs::path(m_file).stem().string();
+
+    return path;
+}
+
+
 /* fold text before using it on fl_message() */
-void fold_text(std::string &text)
+void utils::fold_text(std::string &text)
 {
     const size_t max = 80;
     size_t n = 0;
@@ -66,7 +87,7 @@ static bool is_executable(fs::file_status &st)
 }
 
 
-bool command_in_path(const char *command)
+bool utils::command_in_path(const char *command)
 {
     const char *env = getenv("PATH");
 

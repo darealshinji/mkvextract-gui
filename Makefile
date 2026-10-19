@@ -1,6 +1,7 @@
 BIN  = simple-mkvextract-gui
 
 OBJS = \
+	src/check_browser.o \
 	src/create_cmd.o \
 	src/main.o \
 	src/misc.o \

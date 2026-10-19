@@ -23,7 +23,7 @@
 **/
 
 #include <stddef.h>
-#include <FL/Fl_Check_Button.H>
+#include <filesystem>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -42,14 +42,10 @@ std::string MKVextract::create_cmd(bool extract)
     if (extract) {
         m_args = { "mkvextract", m_file, "--ui-language", "en_US", "--gui-mode" };
     } else {
-        command = "mkvextract " + quote_filename(m_file);
+        command = "mkvextract " + utils::quote_filename(m_file);
     }
 
-    if (m_use_source_path->value() == true) {
-        base = m_outdir_source + file_stem(m_file);
-    } else {
-        base = m_outdir_manual + file_stem(m_file);
-    }
+    base = stem_path();
 
     /* tracks */
     for (size_t i = 0; i < m_track_count; i++) {
@@ -73,15 +69,15 @@ std::string MKVextract::create_cmd(bool extract)
         if (extract) {
             m_args.push_back(strm.str());
         } else {
-            command += " " + quote_filename(strm.str());
+            command += " " + utils::quote_filename(strm.str());
         }
     }
 
     /* attachments */
-    if (m_attach_count > 0) {
+    if (!m_attach.empty()) {
         attach_dir = base + " - Attachments/";
 
-        for (size_t i = 0; i < m_attach_count; i++) {
+        for (size_t i = 0; i < m_attach.size(); i++) {
             if (!m_browser->checked(m_track_count + i + 1)) {
                 continue;
             }
@@ -102,7 +98,7 @@ std::string MKVextract::create_cmd(bool extract)
             if (extract) {
                 m_args.push_back(strm.str());
             } else {
-                command += " " + quote_filename(strm.str());
+                command += " " + utils::quote_filename(strm.str());
             }
         }
     }
@@ -123,7 +119,7 @@ std::string MKVextract::create_cmd(bool extract)
             if (extract) {
                 m_args.push_back(strm.str());
             } else {
-                command += " " + quote_filename(strm.str());
+                command += " " + utils::quote_filename(strm.str());
             }
         }
     }
@@ -136,7 +132,7 @@ std::string MKVextract::create_cmd(bool extract)
             m_args.push_back("chapters");
             m_args.push_back(s);
         } else {
-            command += " chapters " + quote_filename(s);
+            command += " chapters " + utils::quote_filename(s);
         }
     }
 
@@ -148,7 +144,7 @@ std::string MKVextract::create_cmd(bool extract)
             m_args.push_back("tags");
             m_args.push_back(s);
         } else {
-            command += " tags " + quote_filename(s);
+            command += " tags " + utils::quote_filename(s);
         }
     }
 

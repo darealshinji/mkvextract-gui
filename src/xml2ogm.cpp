@@ -55,6 +55,8 @@ CHAPTER02NAME=Chapter 02
 #include <sstream>
 #include <utility>
 
+#include "mkvextract.hpp"
+
 
 
 static inline bool empty(const char *str)
@@ -167,20 +169,20 @@ static inline bool query_int(tinyxml2::XMLElement *elem, int &value)
 }
 
 
-bool xml2ogm(const char *input, const char *output)
+bool utils::xml2ogm(const std::string &input, const std::string &output)
 {
     std::string ogm;
     std::ofstream ofs;
     tinyxml2::XMLDocument doc;
     int val = 0;
 
-    if (empty(input) || empty(output)) {
+    if (input.empty() || output.empty()) {
         return false;
     }
 
     /* load file and find "Chapters" element */
 
-    if (doc.LoadFile(input) != tinyxml2::XML_SUCCESS) {
+    if (doc.LoadFile(input.c_str()) != tinyxml2::XML_SUCCESS) {
         return false;
     }
 

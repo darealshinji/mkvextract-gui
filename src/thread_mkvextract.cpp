@@ -46,7 +46,7 @@ void MKVextract::run_mkvextract()
     std::string base, xml, ogm;
 
     /* check for command */
-    if (!command_in_path("mkvextract")) {
+    if (!utils::command_in_path("mkvextract")) {
         Fl::lock();
 
         fl_message_title("Error");
@@ -105,7 +105,7 @@ void MKVextract::run_mkvextract()
             Fl::awake();
         } else if (strncmp(buf, err.data(), err.size()) == 0) {
             std::string msg = buf + err.size();
-            fold_text(msg);
+            utils::fold_text(msg);
 
             Fl::lock();
 
@@ -131,16 +131,11 @@ void MKVextract::run_mkvextract()
 
     /* convert extracted chapters from XML to OGM format */
     if (m_chapters_entry != 0 && m_browser->checked(m_chapters_entry)) {
-        if (m_use_source_path->value() == true) {
-            base = m_outdir_source + file_stem(m_file);
-        } else {
-            base = m_outdir_manual + file_stem(m_file);
-        }
-
+        base = stem_path();
         xml = base + " - chapters.xml";
         ogm = base + " - chapters.txt";
 
-        if (!xml2ogm(xml.c_str(), ogm.c_str())) {
+        if (!utils::xml2ogm(xml.c_str(), ogm)) {
             Fl::lock();
             fl_message_title("Warning");
             fl_message("Could not create OGM format chapters from file:\n%s!", xml.c_str());

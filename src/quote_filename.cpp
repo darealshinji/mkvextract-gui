@@ -25,6 +25,8 @@
 #include <ctype.h>
 #include <string>
 
+#include "mkvextract.hpp"
+
 
 enum {
     /**
@@ -68,7 +70,7 @@ static const char *uchar_to_hex(unsigned char c)
 
 
 /* quote filenames in a shell compatible way */
-std::string quote_filename(const std::string &in)
+std::string utils::quote_filename(const std::string &in)
 {
     std::string s;
     char m = MODE_PRINTABLE;

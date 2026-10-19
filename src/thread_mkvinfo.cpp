@@ -35,6 +35,7 @@
 #include <FL/Fl_Menu_Item.H>
 #include <FL/fl_ask.H>
 
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -58,11 +59,6 @@ struct track_info {
     std::string channels;
 };
 
-struct attachment_info {
-    std::string name;
-    std::string size;
-};
-
 struct codec_specs {
     const char *id;
     const char *ext;
@@ -75,34 +71,37 @@ static struct codec_specs mkv_codec_list[] =
 };
 
 
-/* display attachment file sizes in Bytes, KiB, MiB or GiB */
-static std::string human_readable_size(std::string &line)
+/* display attachment file sizes in human readable values */
+static std::string human_readable_size(std::string &line, MKVextract::byte_pfx_t pfx)
 {
     long kb, mb, gb, size;
     const char *unitK, *unitM, *unitG;
 
-    const bool base10 = true;
-
-    if constexpr (base10) {
-        kb = 1000;
-        mb = 1000^2;
-        gb = 1000^3;
-        unitK = " KB";
-        unitM = " MB";
-        unitG = " GB";
-    } else {
-        kb = 1024;
-        mb = 1024^2;
-        gb = 1024^3;
-        unitK = " KiB";
-        unitM = " MiB";
-        unitG = " GiB";
+    /* bytes only */
+    if (pfx == MKVextract::PFX_NONE) {
+        return line + " B";
     }
 
     try {
         size = std::stol(line);
     } catch(...) {
         return line + " B";
+    }
+
+    if (pfx == MKVextract::PFX_BINARY) {
+        kb = 1024;
+        mb = 1024 * kb;
+        gb = 1024 * mb;
+        unitK = " KiB";
+        unitM = " MiB";
+        unitG = " GiB";
+    } else if (pfx == MKVextract::PFX_DECIMAL) {
+        kb = 1000;
+        mb = 1000 * kb;
+        gb = 1000 * mb;
+        unitK = " KB";
+        unitM = " MB";
+        unitG = " GB";
     }
 
     if (size >= kb) {
@@ -187,7 +186,7 @@ void MKVextract::run_mkvinfo()
     Fl::awake();
 
     if (!parse_mkvinfo(error)) {
-        fold_text(error);
+        utils::fold_text(error);
 
         Fl::lock();
 
@@ -203,7 +202,11 @@ void MKVextract::run_mkvinfo()
     }
 
     /* save input file's dirname */
-    m_outdir_source = dir_name(m_file);
+    m_outdir_source = std::filesystem::path(m_file).parent_path().string();
+
+    if (!m_outdir_source.ends_with('/')) {
+        m_outdir_source += '/';
+    }
 
     Fl::lock();
 
@@ -233,11 +236,10 @@ bool MKVextract::parse_mkvinfo(std::string &error)
     pipe_command cmd;
     std::ifstream ifs;
     std::vector<struct track_info> tracks;
-    std::vector<struct attachment_info> attach;
 
     error.clear();
 
-    if (!command_in_path("mkvinfo")) {
+    if (!utils::command_in_path("mkvinfo")) {
         error = "mkvinfo doesn't seem to be in PATH!";
         return false;
     }
@@ -384,15 +386,17 @@ bool MKVextract::parse_mkvinfo(std::string &error)
 
             if (line == "| + Attached") {
                 struct attachment_info info;
-                attach.push_back(info);
+                m_attach.push_back(info);
                 continue;
             }
             else if (match(line, "|  + File name: ")) {
-                attach.back().name = line;
+                m_attach.back().name = line;
                 continue;
             }
             else if (match(line, "|  + File data: size ")) {
-                attach.back().size = human_readable_size(line);
+                m_attach.back().size_bytes = human_readable_size(line, PFX_NONE);
+                m_attach.back().size_binary = human_readable_size(line, PFX_BINARY);
+                m_attach.back().size_decimal = human_readable_size(line, PFX_DECIMAL);
                 continue;
             }
             else if (line == "|+ Chapters") {
@@ -414,6 +418,7 @@ bool MKVextract::parse_mkvinfo(std::string &error)
 
     m_outnames.clear();
 
+    /* tracks */
     for (size_t i = 0; i < tracks.size(); i++) {
         std::stringstream e; /* browser entry */
         std::stringstream filename;
@@ -452,19 +457,32 @@ bool MKVextract::parse_mkvinfo(std::string &error)
         m_outnames.push_back(filename.str());
     }
 
-    for (size_t i = 0; i < attach.size(); i++) {
+    /* attachments */
+    for (size_t i = 0; i < m_attach.size(); i++) {
         std::stringstream e; /* browser entry */
-        e << "Attachment " << i+1 << ": " << attach.at(i).name << " [" << attach.at(i).size << "]";
+        e << "Attachment " << i+1 << ": " << m_attach.at(i).name << " [";
+
+        switch (m_prefixes)
+        {
+        case PFX_BINARY:
+            e << m_attach.at(i).size_binary << "]";
+            break;
+        case PFX_DECIMAL:
+            e << m_attach.at(i).size_decimal << "]";
+            break;
+        case PFX_NONE:
+            e << m_attach.at(i).size_bytes << "]";
+            break;
+        }
 
         Fl::lock();
         m_browser->add(e.str().c_str());
         Fl::unlock();
 
-        m_outnames.push_back(attach.at(i).name);
+        m_outnames.push_back(m_attach.at(i).name);
     }
 
     m_track_count = tracks.size();
-    m_attach_count = attach.size();
     m_timestamps_entry = 0;
     m_chapters_entry = 0;
     bool has_timestamps = m_timestampIDs.size() > 0;
