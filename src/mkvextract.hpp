@@ -45,29 +45,11 @@ class rotate_box;
 
 class MKVextract
 {
-public:
-
-    typedef enum {
-        PFX_BINARY,
-        PFX_DECIMAL,
-        PFX_NONE
-    } byte_pfx_t;
-
-    struct attachment_info {
-        std::string name;
-        std::string size_bytes;
-        std::string size_binary;
-        std::string size_decimal;
-    };
-
 private:
-
-    byte_pfx_t m_prefixes = PFX_BINARY;
-    Fl_Menu_Item *m_submenu;
 
     /* entry order in browser is tracks-->attachments-->timestamps-->chapters-->tags */
     size_t m_track_count = 0;
-    std::vector<struct attachment_info> m_attach; /* count is m_attach.size() */
+    size_t m_attach_count = 0;
     size_t m_timestamps_entry = 0;
     size_t m_chapters_entry = 0;
     size_t m_tags_entry = 0;
@@ -77,12 +59,10 @@ private:
     std::string m_file, m_outdir_source, m_outdir_manual;
     std::vector<std::string> m_args;
 
-
     /* mkvextract/mkvinfo */
     void run_mkvextract();
     void run_mkvinfo();
     bool parse_mkvinfo(std::string &error);
-
 
     /* these objects must be deleted in the d'tor */
     posix_thread *m_th_info;
@@ -90,9 +70,6 @@ private:
     Fl_Double_Window *m_win;
     Fl_Double_Window *m_cmd;
     Fl_Text_Buffer *m_txtbuf;
-    Fl_Native_File_Chooser *m_fcdir;
-    Fl_Native_File_Chooser *m_fcfile;
-
 
     /* widgets (automatically deleted) */
     check_browser *m_browser;
@@ -108,7 +85,6 @@ private:
     Fl_Box *m_outdir_field;
     Fl_Box *m_infile_label;
 
-
     /* actions used by callbacks */
     void do_abort();
     void do_check_outdir();
@@ -123,8 +99,6 @@ private:
     void do_select_attachments();
     void do_set_outdir();
     void do_update_browser();
-    void do_update_pfx(byte_pfx_t pfx);
-
 
     std::string create_cmd(bool extract);
     std::string stem_path();

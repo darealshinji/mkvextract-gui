@@ -58,7 +58,14 @@ enum {
 
     /* initial command line window dimensions */
     CMD_W = 640,
-    CMD_H = 320
+    CMD_H = 320,
+
+    /* Fl_Native_File_Chooser */
+    FNFC_PICKED      =  0,
+    FNFC_CANCEL      =  1,
+    FNFC_ERROR       = -1,
+    FNFC_BROWSE_FILE = Fl_Native_File_Chooser::BROWSE_FILE,
+    FNFC_BROWSE_DIR  = Fl_Native_File_Chooser::BROWSE_DIRECTORY
 };
 
 
@@ -92,6 +99,35 @@ enum {
         WIDGET->callback(callback_function, this); \
     } while (0)
 
+
+
+static const char *file_chooser(int val, const char *title, const char *filter = NULL)
+{
+    const char *p = NULL;
+
+    Fl_Native_File_Chooser fnfc(val);
+    fnfc.title(title);
+
+    if (filter) {
+        fnfc.filter(filter);
+    }
+
+    switch (fnfc.show())
+    {
+    case FNFC_PICKED:
+        p = fnfc.filename();
+        break;
+    case FNFC_ERROR:
+        fl_message_title("Error");
+        fl_alert("%s", fnfc.errmsg());
+        break;
+    case FNFC_CANCEL:
+    default:
+        break;
+    }
+
+    return (p && *p) ? p : NULL;
+}
 
 
 void MKVextract::restore_main_window()
@@ -150,77 +186,42 @@ void MKVextract::do_dnd()
 }
 
 
-void MKVextract::do_update_pfx(byte_pfx_t pfx)
-{
-    m_prefixes = pfx;
-
-    /* update submenu */
-    for (size_t i = 0; i < 3; i++) {
-        m_submenu[i].clear();
-    }
-    m_submenu[pfx].set();
-
-    int line = m_track_count + 1;
-
-    /* update browser entries */
-    for (size_t i = 0; i < m_attach.size(); i++, line++) {
-        std::stringstream e;
-        e << "Attachment " << i+1 << ": " << m_attach.at(i).name << " [";
-
-        switch (m_prefixes)
-        {
-        case PFX_BINARY:
-            e << m_attach.at(i).size_binary << "]";
-            break;
-        case PFX_DECIMAL:
-            e << m_attach.at(i).size_decimal << "]";
-            break;
-        case PFX_NONE:
-            e << m_attach.at(i).size_bytes << "]";
-            break;
-        }
-
-        m_browser->update_text(line, e.str().c_str());
-    }
-}
-
-
 void MKVextract::do_set_outdir()
 {
-    const char *p;
+    const char *p = file_chooser(FNFC_BROWSE_DIR, "Select output directory");
 
-    m_fcdir->title("Select output directory");
-
-    if (m_fcdir->show() == 0 && (p = m_fcdir->filename()) != NULL && *p != 0) {
-        m_outdir_manual = p;
-
-        if (!m_outdir_manual.ends_with('/')) {
-            m_outdir_manual += '/';
-        }
-
-        m_outdir_field->label(m_outdir_manual.c_str());
-        m_outdir_field->activate();
-        m_use_source_path->clear();
+    if (!p) {
+        return;
     }
+
+    m_outdir_manual = p;
+
+    if (!m_outdir_manual.ends_with('/')) {
+        m_outdir_manual += '/';
+    }
+
+    m_outdir_field->label(m_outdir_manual.c_str());
+    m_outdir_field->activate();
+    m_use_source_path->clear();
 }
 
 
 void MKVextract::do_open_file()
 {
-    const char *p;
+    const char *filter = "*.mkv|*.mka|*.mks|*.mk3d|*.webm"; /* https://www.matroska.org */
+    const char *p = file_chooser(FNFC_BROWSE_FILE, "Select a file", filter);
 
-    m_fcfile->title("Select a file");
-    m_fcfile->filter("*.mkv|*.mka|*.mks|*.mk3d|*.webm"); /* see https://www.matroska.org */
-
-    if (m_fcfile->show() == 0 && (p = m_fcfile->filename()) != NULL && *p != 0) {
-        /* stop threads */
-        m_th_extract->cancel();
-        m_th_info->cancel();
-
-        /* get file infos */
-        m_file = p;
-        m_th_info->start();
+    if (!p) {
+        return;
     }
+
+    /* stop threads */
+    m_th_extract->cancel();
+    m_th_info->cancel();
+
+    /* get file infos */
+    m_file = p;
+    m_th_info->start();
 }
 
 
@@ -298,7 +299,7 @@ void MKVextract::do_update_browser()
     auto sel_none = sel_all->next();
     auto sel_attach = sel_none->next();
 
-    if (!m_attach.empty()) {
+    if (m_attach_count > 0) {
         sel_attach->activate();
     }
 
@@ -329,7 +330,7 @@ void MKVextract::do_update_browser()
 
         /* all attachments selected? */
         size_t start = m_track_count + 1;
-        size_t end = m_track_count + m_attach.size();
+        size_t end = m_track_count + m_attach_count;
 
         if (m_browser->range_checked(start, end)) {
             sel_attach->deactivate();
@@ -365,7 +366,7 @@ void MKVextract::do_select_attachments()
 {
     int line = m_track_count + 1;
 
-    for (size_t i = 0; i < m_attach.size(); i++, line++) {
+    for (size_t i = 0; i < m_attach_count; i++, line++) {
         m_browser->set_checked(line);
     }
 
@@ -379,22 +380,12 @@ void MKVextract::init_main_window()
     const int left_align   = FL_ALIGN_LEFT   | FL_ALIGN_INSIDE | FL_ALIGN_CLIP;
     int x, y, w, h;
 
-    static Fl_Menu_Item submenu[] {
-        {"Binary prefixes",  0, MENUCB2(do_update_pfx, PFX_BINARY),  this, FL_MENU_TOGGLE|FL_MENU_VALUE},
-        {"Decimal prefixes", 0, MENUCB2(do_update_pfx, PFX_DECIMAL), this, FL_MENU_TOGGLE},
-        {"Bytes only",       0, MENUCB2(do_update_pfx, PFX_NONE),    this, FL_MENU_TOGGLE},
-        {0}
-    };
-
-    m_submenu = submenu;
-
     static Fl_Menu_Item menu[] = {
-        {"Select all",         0, MENUCB(do_select_all),  this,        FL_MENU_INACTIVE},
-        {"Select none",        0, MENUCB(do_select_none), this,        FL_MENU_INACTIVE},
-        {"Select attachments", 0, MENUCB(do_select_attachments), this, FL_MENU_INACTIVE|FL_MENU_DIVIDER},
-        {"Open file",          0, MENUCB(do_open_file),   this},
-        {"File sizes",         0, NULL,                   m_submenu,   FL_SUBMENU_POINTER},
-        {"Quit",               0, MENUCB(do_quit),        this},
+        {"Select all",         0, MENUCB(do_select_all),         this, FL_MENU_INACTIVE},
+        {"Select none",        0, MENUCB(do_select_none),        this, FL_MENU_INACTIVE},
+        {"Select attachments", 0, MENUCB(do_select_attachments), this, FL_MENU_INACTIVE | FL_MENU_DIVIDER},
+        {"Open file",          0, MENUCB(do_open_file),          this},
+        {"Quit",               0, MENUCB(do_quit),               this},
         {0}
     };
 
@@ -638,29 +629,17 @@ MKVextract::MKVextract(const char *file)
     /* init windows */
     init_main_window();
     init_cmd_window();
-
-    /* native file choosers */
-    m_fcdir = new Fl_Native_File_Chooser(Fl_Native_File_Chooser::BROWSE_DIRECTORY);
-    m_fcfile = new Fl_Native_File_Chooser(Fl_Native_File_Chooser::BROWSE_FILE);
-
 }
 
 
 /* d'tor */
 MKVextract::~MKVextract()
 {
-    /* threads */
     delete m_th_extract;
     delete m_th_info;
-
-    /* main widgets */
     delete m_cmd;
     delete m_win;
     delete m_txtbuf;
-
-    /* file choosers */
-    delete m_fcdir;
-    delete m_fcfile;
 }
 
 

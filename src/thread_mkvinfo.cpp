@@ -59,6 +59,11 @@ struct track_info {
     std::string channels;
 };
 
+struct attachment_info {
+    std::string name;
+    std::string size;
+};
+
 struct codec_specs {
     const char *id;
     const char *ext;
@@ -72,15 +77,9 @@ static struct codec_specs mkv_codec_list[] =
 
 
 /* display attachment file sizes in human readable values */
-static std::string human_readable_size(std::string &line, MKVextract::byte_pfx_t pfx)
+static std::string human_readable_size(std::string &line)
 {
-    long kb, mb, gb, size;
-    const char *unitK, *unitM, *unitG;
-
-    /* bytes only */
-    if (pfx == MKVextract::PFX_NONE) {
-        return line + " B";
-    }
+    long size;
 
     try {
         size = std::stol(line);
@@ -88,21 +87,9 @@ static std::string human_readable_size(std::string &line, MKVextract::byte_pfx_t
         return line + " B";
     }
 
-    if (pfx == MKVextract::PFX_BINARY) {
-        kb = 1024;
-        mb = 1024 * kb;
-        gb = 1024 * mb;
-        unitK = " KiB";
-        unitM = " MiB";
-        unitG = " GiB";
-    } else if (pfx == MKVextract::PFX_DECIMAL) {
-        kb = 1000;
-        mb = 1000 * kb;
-        gb = 1000 * mb;
-        unitK = " KB";
-        unitM = " MB";
-        unitG = " GB";
-    }
+    const long kb = 1024;
+    const long mb = 1024 * kb;
+    const long gb = 1024 * mb;
 
     if (size >= kb) {
         const char *unit;
@@ -111,13 +98,13 @@ static std::string human_readable_size(std::string &line, MKVextract::byte_pfx_t
 
         if (size < mb) {
             d /= kb;
-            unit = unitK;
+            unit = " KiB";
         } else if (size < gb) {
             d /= mb;
-            unit = unitM;
+            unit = " MiB";
         } else {
             d /= gb;
-            unit = unitG;
+            unit = " GiB";
         }
 
         snprintf(buf, sizeof(buf), "%.1f", d);
@@ -211,9 +198,17 @@ void MKVextract::run_mkvinfo()
     Fl::lock();
 
     /* update widgets */
+    auto sel_all = m_browser->menu();
+    auto sel_none = sel_all->next();
+    auto sel_attach = sel_none->next();
+    sel_all->activate();
+    sel_none->deactivate();
 
-    m_browser->menu()->activate(); /* "Select all" */
-    m_browser->menu()->next()->deactivate(); /* "Select none" */
+    if (m_attach_count == 0) {
+        sel_attach->deactivate();
+    } else {
+        sel_attach->activate();
+    }
 
     m_infile_label->copy_label(m_file.c_str());
     m_infile_label->activate();
@@ -236,6 +231,7 @@ bool MKVextract::parse_mkvinfo(std::string &error)
     pipe_command cmd;
     std::ifstream ifs;
     std::vector<struct track_info> tracks;
+    std::vector<struct attachment_info> attach;
 
     error.clear();
 
@@ -386,17 +382,15 @@ bool MKVextract::parse_mkvinfo(std::string &error)
 
             if (line == "| + Attached") {
                 struct attachment_info info;
-                m_attach.push_back(info);
+                attach.push_back(info);
                 continue;
             }
             else if (match(line, "|  + File name: ")) {
-                m_attach.back().name = line;
+                attach.back().name = line;
                 continue;
             }
             else if (match(line, "|  + File data: size ")) {
-                m_attach.back().size_bytes = human_readable_size(line, PFX_NONE);
-                m_attach.back().size_binary = human_readable_size(line, PFX_BINARY);
-                m_attach.back().size_decimal = human_readable_size(line, PFX_DECIMAL);
+                attach.back().size = human_readable_size(line);
                 continue;
             }
             else if (line == "|+ Chapters") {
@@ -458,31 +452,20 @@ bool MKVextract::parse_mkvinfo(std::string &error)
     }
 
     /* attachments */
-    for (size_t i = 0; i < m_attach.size(); i++) {
+    for (size_t i = 0; i < attach.size(); i++) {
         std::stringstream e; /* browser entry */
-        e << "Attachment " << i+1 << ": " << m_attach.at(i).name << " [";
-
-        switch (m_prefixes)
-        {
-        case PFX_BINARY:
-            e << m_attach.at(i).size_binary << "]";
-            break;
-        case PFX_DECIMAL:
-            e << m_attach.at(i).size_decimal << "]";
-            break;
-        case PFX_NONE:
-            e << m_attach.at(i).size_bytes << "]";
-            break;
-        }
+        e << "Attachment " << i+1 << ": " << attach.at(i).name;
+        e << " [" << attach.at(i).size << "]";
 
         Fl::lock();
         m_browser->add(e.str().c_str());
         Fl::unlock();
 
-        m_outnames.push_back(m_attach.at(i).name);
+        m_outnames.push_back(attach.at(i).name);
     }
 
     m_track_count = tracks.size();
+    m_attach_count = attach.size();
     m_timestamps_entry = 0;
     m_chapters_entry = 0;
     bool has_timestamps = m_timestampIDs.size() > 0;

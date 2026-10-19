@@ -25,7 +25,6 @@
 #include <FL/Fl.H>
 #include <FL/Fl_Check_Browser.H>
 #include <FL/Fl_Menu_Item.H>
-#include <string.h>
 
 #include "check_browser.hpp"
 
@@ -57,7 +56,7 @@ check_browser::check_browser(Fl_Menu_Item *m, int X, int Y, int W, int H)
 
 /* d'tor */
 check_browser::~check_browser() {
-    Fl_Check_Browser::clear();
+    clear();
 }
 
 
@@ -74,16 +73,5 @@ bool check_browser::range_checked(size_t start, size_t end)
     }
 
     return true;
-}
-
-
-void check_browser::update_text(int index, const char *new_text) {
-    auto item = reinterpret_cast<struct Fl_Check_Browser::cb_item *>(item_at(index));
-
-    if (item) {
-        free(item->text);
-        item->text = strdup(new_text);
-        redraw_line(item);
-    }
 }
 

@@ -34,12 +34,13 @@ class check_browser : public Fl_Check_Browser
 private:
 
     Fl_Menu_Item *m_menu;
+
     int handle(int event);
 
 public:
 
     check_browser(Fl_Menu_Item *m, int X, int Y, int W, int H);
-    virtual ~check_browser();
+    ~check_browser();
 
     Fl_Menu_Item *menu() const { return m_menu; }
 
@@ -55,8 +56,5 @@ public:
 
     /* returns true if all items within a range are checked */
     bool range_checked(size_t start, size_t end);
-
-    /* update text at index position */
-    void update_text(int index, const char *new_text);
 };
 

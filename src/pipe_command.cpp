@@ -72,7 +72,7 @@ FILE *pipe_command::pipe_open(char **argv)
 
 FILE *pipe_command::pipe_open(const std::vector<std::string> &argv)
 {
-    std::vector<char*> vec;
+    std::vector<char *> vec;
 
     vec.reserve(argv.size() + 1);
 

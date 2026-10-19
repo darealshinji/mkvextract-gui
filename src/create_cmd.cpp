@@ -74,10 +74,10 @@ std::string MKVextract::create_cmd(bool extract)
     }
 
     /* attachments */
-    if (!m_attach.empty()) {
+    if (m_attach_count > 0) {
         attach_dir = base + " - Attachments/";
 
-        for (size_t i = 0; i < m_attach.size(); i++) {
+        for (size_t i = 0; i < m_attach_count; i++) {
             if (!m_browser->checked(m_track_count + i + 1)) {
                 continue;
             }
