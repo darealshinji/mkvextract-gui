@@ -59,7 +59,7 @@ public:
     : Fl_Box(FL_NO_BOX, X, Y, W, H, NULL)
     {}
 
-    ~dnd_box()
+    virtual ~dnd_box()
     {}
 };
 
