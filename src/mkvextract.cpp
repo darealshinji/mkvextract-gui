@@ -34,7 +34,6 @@
 #include <FL/Fl_Double_Window.H>
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Menu_Item.H>
-#include <FL/Fl_Native_File_Chooser.H>
 #include <FL/Fl_Text_Buffer.H>
 #include <FL/Fl_Text_Display.H>
 #include <FL/filename.H>
@@ -46,6 +45,7 @@
 
 #include "check_browser.hpp"
 #include "dnd.hpp"
+#include "fnfc.hpp"
 #include "posix_thread.hpp"
 #include "rotate_box.hpp"
 #include "mkvextract.hpp"
@@ -91,32 +91,6 @@ enum {
         }; \
         WIDGET->callback(callback_function, this); \
     } while (0)
-
-
-
-static const char *file_chooser_pick(Fl_Native_File_Chooser &fnfc)
-{
-    enum {
-        FNFC_PICKED =  0,
-        FNFC_CANCEL =  1,
-        FNFC_ERROR  = -1
-    };
-
-    switch (fnfc.show())
-    {
-    case FNFC_PICKED:
-        return fnfc.filename();
-    case FNFC_ERROR:
-        fl_message_title("Error");
-        fl_alert("%s", fnfc.errmsg());
-        break;
-    case FNFC_CANCEL:
-    default:
-        break;
-    }
-
-    return NULL;
-}
 
 
 void MKVextract::restore_main_window()
@@ -177,10 +151,10 @@ void MKVextract::do_dnd()
 
 void MKVextract::do_set_outdir()
 {
-    Fl_Native_File_Chooser fnfc(Fl_Native_File_Chooser::BROWSE_DIRECTORY);
-    fnfc.title("Select output directory");
+    FNFC fc(FNFC::BROWSE_DIRECTORY, "Set output directory");
+    fc.options(FNFC::NEW_FOLDER);
 
-    const char *dir = file_chooser_pick(fnfc);
+    const char *dir = fc.select();
 
     if (!dir || !*dir) {
         return;
@@ -200,11 +174,10 @@ void MKVextract::do_set_outdir()
 
 void MKVextract::do_open_file()
 {
-    Fl_Native_File_Chooser fnfc(Fl_Native_File_Chooser::BROWSE_FILE);
-    fnfc.title("Select a file");
-    fnfc.filter("Matroska\t*.mkv|*.mka|*.mks|*.mk3d|*.webm");
+    FNFC fc(FNFC::BROWSE_FILE, "Select a file");
+    fc.filter("Matroska\t*.mkv,*.mka,*.mks,*.mk3d,*.webm");
 
-    const char *file = file_chooser_pick(fnfc);
+    const char *file = fc.select();
 
     if (!file || !*file) {
         return;
