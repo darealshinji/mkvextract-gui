@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <string>
 #include <vector>
+#include "posix_thread.hpp"
 
 class Fl_Box;
 class Fl_Button;
@@ -38,8 +39,7 @@ class Fl_Native_File_Chooser;
 class Fl_Text_Buffer;
 class Fl_Widget;
 class check_browser;
-class dnd_box;
-class posix_thread;
+class dnd_window;
 class rotate_box;
 
 
@@ -67,13 +67,12 @@ private:
     /* these objects must be deleted in the d'tor */
     posix_thread *m_th_info;
     posix_thread *m_th_extract;
-    Fl_Double_Window *m_win;
+    dnd_window *m_win;
     Fl_Double_Window *m_cmd;
     Fl_Text_Buffer *m_txtbuf;
 
-    /* widgets (automatically deleted) */
+    /* other widgets */
     check_browser *m_browser;
-    dnd_box *m_dnd_area;
     rotate_box *m_rotate;
     Fl_Button *m_but_outdir;
     Fl_Button *m_but_add;
@@ -96,16 +95,26 @@ private:
     void do_quit();
     void do_select_all();
     void do_select_none();
-    void do_select_attachments();
+    void do_select_attach();
     void do_set_outdir();
     void do_update_browser();
 
-    std::string create_cmd(bool extract);
+    enum {
+        CREATE_VECTOR,
+        CREATE_TEXTBUFFER
+    };
+    void create_cmd(int val);
+
     std::string stem_path();
 
     void restore_main_window();
     void init_main_window();
     void init_cmd_window();
+
+    void stop_threads() {
+        m_th_extract->stop();
+        m_th_info->stop();
+    }
 
 
 public:
@@ -114,22 +123,6 @@ public:
     ~MKVextract();
 
     void show();
-};
-
-
-/* very simple auto_ptr-like class */
-class auto_free
-{
-private:
-    void *m_ptr;
-
-public:
-    auto_free(void *ptr) : m_ptr(ptr)
-    {}
-
-    ~auto_free() {
-        free(m_ptr);
-    }
 };
 
 

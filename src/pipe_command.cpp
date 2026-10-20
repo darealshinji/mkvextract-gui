@@ -33,60 +33,61 @@
 #include "pipe_command.hpp"
 
 
-pipe_command::pipe_command()
-{}
-
-
-pipe_command::~pipe_command()
+pipe_command::pipe_command(const char **argv, size_t size)
 {
-    pipe_close();
+    if (argv && argv[0] && size > 0 && argv[size-1] == NULL) {
+        m_argv = const_cast<char **>(argv);
+    }
 }
 
 
-FILE *pipe_command::pipe_open(char **argv)
+pipe_command::pipe_command(const std::vector<std::string> &argv)
+{
+    m_vec.reserve(argv.size() + 1);
+
+    for (auto &e : argv) {
+        m_vec.push_back(e.c_str());
+    }
+
+    m_vec.push_back(NULL);
+    m_argv = const_cast<char **>(std::data(m_vec));
+}
+
+
+pipe_command::~pipe_command() {
+    close_pipe();
+}
+
+
+bool pipe_command::open_pipe()
 {
     enum { r = 0, w = 1 };
     int fd[2];
 
-    pipe_close();
+    if (is_open() || !m_argv || !m_argv[0]) {
+        return false;
+    }
 
-    if (!argv || pipe2(fd, O_CLOEXEC) == -1) {
-        return NULL;
+    if (pipe2(fd, O_CLOEXEC) == -1) {
+        return false;
     }
 
     if ((m_pid = vfork()) != 0) {
         close(fd[w]);
         m_fp = fdopen(fd[r], "r");
-        return m_fp;
+        return is_open();
     }
 
     close(fd[r]);
     dup2(fd[w], 1);
     close(fd[w]);
 
-    execvp(argv[0], argv);
-
+    execvp(m_argv[0], m_argv);
     _exit(127);
 }
 
 
-FILE *pipe_command::pipe_open(const std::vector<std::string> &argv)
-{
-    std::vector<char *> vec;
-
-    vec.reserve(argv.size() + 1);
-
-    for (auto &e : argv) {
-        vec.push_back(const_cast<char *>(e.c_str()));
-    }
-
-    vec.push_back(NULL);
-
-    return pipe_open(std::data(vec));
-}
-
-
-void pipe_command::pipe_close()
+void pipe_command::close_pipe()
 {
     if (m_fp) {
         fclose(m_fp);
@@ -98,5 +99,27 @@ void pipe_command::pipe_close()
 
     m_fp = NULL;
     m_pid = -1;
+}
+
+
+bool pipe_command::getline(std::string &buffer)
+{
+    int ch;
+
+    if (!is_open() || eof() || error()) {
+        return false;
+    }
+
+    buffer.clear();
+
+    while ((ch = fgetc(m_fp)) != EOF) {
+        if (ch == '\n') {
+            return true;
+        }
+
+        buffer += static_cast<char>(ch);
+    }
+
+    return (!buffer.empty());
 }
 

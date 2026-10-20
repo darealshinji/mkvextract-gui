@@ -48,7 +48,7 @@ public:
     {}
 
     ~posix_thread() {
-        cancel();
+        stop();
     }
 
     void start()
@@ -61,7 +61,7 @@ public:
         }
     }
 
-    void cancel()
+    void stop()
     {
         if (m_running) {
             pthread_cancel(m_thread);

@@ -23,6 +23,8 @@
 **/
 
 #include <stddef.h>
+#include <FL/Fl.H>
+#include <FL/Fl_Text_Buffer.H>
 #include <filesystem>
 #include <sstream>
 #include <string>
@@ -32,17 +34,37 @@
 #include "mkvextract.hpp"
 
 
-std::string MKVextract::create_cmd(bool extract)
+void MKVextract::create_cmd(int val)
 {
     bool has_tracks = false, has_attach = false;
-    std::string command, base, attach_dir;
+    std::string base, attach_dir;
+
+    auto add_option = [&, this] (const char *str) {
+        if (val == CREATE_VECTOR) {
+            m_args.emplace_back(str);
+        } else {
+            m_txtbuf->append(" ", 1);
+            m_txtbuf->append(str);
+        }
+    };
+
+    auto add_path = [&, this] (std::string str) {
+        if (val == CREATE_VECTOR) {
+            m_args.push_back(std::move(str));
+        } else {
+            std::string s = ' ' + utils::quote_filename(str);
+            m_txtbuf->append(s.c_str(), s.length());
+        }
+    };
+
 
     m_args.clear();
 
-    if (extract) {
+    if (val == CREATE_VECTOR) {
         m_args = { "mkvextract", m_file, "--ui-language", "en_US", "--gui-mode" };
     } else {
-        command = "mkvextract " + utils::quote_filename(m_file);
+        std::string s = "mkvextract " + utils::quote_filename(m_file);
+        m_txtbuf->replace(0, m_txtbuf->length(), s.c_str(), s.length());
     }
 
     base = stem_path();
@@ -55,22 +77,12 @@ std::string MKVextract::create_cmd(bool extract)
 
         if (!has_tracks) {
             has_tracks = true;
-
-            if (extract) {
-                m_args.push_back("tracks");
-            } else {
-                command += " tracks";
-            }
+            add_option("tracks");
         }
 
         std::stringstream strm;
-        strm << i << ":" << base << " - " << m_outnames.at(i);
-
-        if (extract) {
-            m_args.push_back(strm.str());
-        } else {
-            command += " " + utils::quote_filename(strm.str());
-        }
+        strm << i << ':' << base << " - " << m_outnames.at(i);
+        add_path(strm.str());
     }
 
     /* attachments */
@@ -84,70 +96,37 @@ std::string MKVextract::create_cmd(bool extract)
 
             if (!has_attach) {
                 has_attach = true;
-
-                if (extract) {
-                    m_args.push_back("attachments");
-                } else {
-                    command += " attachments";
-                }
+                add_option("attachments");
             }
 
             std::stringstream strm;
-            strm << i+1 << ":" << attach_dir << m_outnames.at(m_track_count + i);
-
-            if (extract) {
-                m_args.push_back(strm.str());
-            } else {
-                command += " " + utils::quote_filename(strm.str());
-            }
+            strm << i+1 << ':' << attach_dir << m_outnames.at(m_track_count + i);
+            add_path(strm.str());
         }
     }
 
     /* timestamps */
     if (m_timestamps_entry > 0 && m_browser->checked(m_timestamps_entry)) {
-        if (extract) {
-            m_args.push_back("timestamps_v2");
-        } else {
-            command += " timestamps_v2";
-        }
+        add_option("timestamps_v2");
 
         for (size_t i = 0; i < m_timestampIDs.size(); i++) {
             int id = m_timestampIDs.at(i);
             std::stringstream strm;
-            strm << id << ":" << base << " - track " << id+1 << " timestamps.txt";
-
-            if (extract) {
-                m_args.push_back(strm.str());
-            } else {
-                command += " " + utils::quote_filename(strm.str());
-            }
+            strm << id << ':' << base << " - track " << id+1 << " timestamps.txt";
+            add_path(strm.str());
         }
     }
 
     /* chapters */
     if (m_chapters_entry > 0 && m_browser->checked(m_chapters_entry)) {
-        std::string s = base + " - chapters.xml";
-
-        if (extract) {
-            m_args.push_back("chapters");
-            m_args.push_back(s);
-        } else {
-            command += " chapters " + utils::quote_filename(s);
-        }
+        add_option("chapters");
+        add_path(base + " - chapters.xml");
     }
 
     /* tags */
     if (m_tags_entry > 0 && m_browser->checked(m_tags_entry)) {
-        std::string s = base + " - tags.xml";
-
-        if (extract) {
-            m_args.push_back("tags");
-            m_args.push_back(s);
-        } else {
-            command += " tags " + utils::quote_filename(s);
-        }
+        add_option("tags");
+        add_path(base + " - tags.xml");
     }
-
-    return command;
 }
 

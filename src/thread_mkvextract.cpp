@@ -34,7 +34,7 @@
 #include <string_view>
 
 #include "check_browser.hpp"
-#include "dnd.hpp"
+#include "dnd_window.hpp"
 #include "pipe_command.hpp"
 #include "rotate_box.hpp"
 #include "mkvextract.hpp"
@@ -42,7 +42,6 @@
 
 void MKVextract::run_mkvextract()
 {
-    pipe_command cmd;
     std::string base, xml, ogm;
 
     /* check for command */
@@ -58,11 +57,9 @@ void MKVextract::run_mkvextract()
         return;
     }
 
-    create_cmd(true);
-
     Fl::lock();
 
-    m_dnd_area->deactivate();
+    m_win->dnd_enabled(false);
     m_use_source_path->deactivate();
     m_but_outdir->deactivate();
     m_but_add->deactivate();
@@ -78,10 +75,11 @@ void MKVextract::run_mkvextract()
     Fl::unlock();
     Fl::awake();
 
-    /* create pipe */
-    FILE *fp = cmd.pipe_open(m_args);
+    /* run mkvextract */
+    create_cmd(CREATE_VECTOR);
+    pipe_command cmd(m_args);
 
-    if (!fp) {
+    if (!cmd.open_pipe()) {
         Fl::lock();
         m_progress_box->label("ERROR");
         restore_main_window();
@@ -91,28 +89,26 @@ void MKVextract::run_mkvextract()
     }
 
     /* read lines */
-    constexpr std::string_view prog{"#GUI#progress "};
-    constexpr std::string_view err{"#GUI#error "};
-    size_t n = 0;
-    char *buf = NULL;
-    auto_free af(buf);
+    constexpr std::string_view gui_progress{"#GUI#progress "};
+    constexpr std::string_view gui_error{"#GUI#error "};
+    std::string line;
 
-    while (getline(&buf, &n, fp) != -1) {
-        if (strncmp(buf, prog.data(), prog.size()) == 0) {
+    while (cmd.getline(line)) {
+        if (line.starts_with(gui_progress)) {
             Fl::lock();
-            m_progress_box->copy_label(buf + prog.size());
+            m_progress_box->copy_label(line.c_str() + gui_progress.size());
             Fl::unlock();
             Fl::awake();
-        } else if (strncmp(buf, err.data(), err.size()) == 0) {
-            std::string msg = buf + err.size();
-            utils::fold_text(msg);
+        } else if (line.starts_with(gui_error)) {
+            line.erase(0, gui_error.size());
+            utils::fold_text(line);
 
             Fl::lock();
 
             m_progress_box->label("ERROR");
             restore_main_window();
             fl_message_title("Error");
-            fl_message("%s", msg.c_str());
+            fl_message("%s", line.c_str());
 
             Fl::unlock();
             Fl::awake();
@@ -120,8 +116,6 @@ void MKVextract::run_mkvextract()
             return;
         }
     }
-
-    cmd.pipe_close();
 
     Fl::lock();
     m_progress_box->label("DONE");
@@ -135,7 +129,7 @@ void MKVextract::run_mkvextract()
         xml = base + " - chapters.xml";
         ogm = base + " - chapters.txt";
 
-        if (!utils::xml2ogm(xml.c_str(), ogm)) {
+        if (!utils::xml2ogm(xml, ogm)) {
             Fl::lock();
             fl_message_title("Warning");
             fl_message("Could not create OGM format chapters from file:\n%s!", xml.c_str());

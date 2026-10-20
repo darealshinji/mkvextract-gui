@@ -59,14 +59,12 @@ void utils::fold_text(std::string &text)
     const size_t max = 80;
     size_t n = 0;
 
-    if (text.size() <= max) {
-        return;
-    }
-
-    for (auto &c : text) {
-        if (++n >= max && isspace(c)) {
-            c = '\n';
-            n = 0;
+    if (text.size() > max) {
+        for (auto &c : text) {
+            if (++n >= max && isspace(c)) {
+                c = '\n';
+                n = 0;
+            }
         }
     }
 }

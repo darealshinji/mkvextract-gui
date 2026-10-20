@@ -32,17 +32,24 @@ class pipe_command
 {
 private:
 
+    std::vector<const char *> m_vec;
+    char **m_argv = NULL;
     pid_t m_pid = -1;
     FILE *m_fp = NULL;
 
 
 public:
 
-    pipe_command();
+    pipe_command(const char **argv, size_t n);
+    pipe_command(const std::vector<std::string> &argv);
     ~pipe_command();
 
-    FILE *pipe_open(char **argv);
-    FILE *pipe_open(const std::vector<std::string> &argv);
-    void pipe_close();
+    bool open_pipe();
+    void close_pipe();
+    bool getline(std::string &buffer);
+
+    bool is_open() const { return (m_fp != NULL); }
+    bool error() { return (m_fp && ferror(m_fp) != 0); }
+    bool eof()   { return (m_fp && feof(m_fp) != 0); }
 };
 
