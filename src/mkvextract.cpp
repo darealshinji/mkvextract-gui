@@ -51,6 +51,27 @@
 #include "mkvextract.hpp"
 
 
+/* inline lambda start routine for pthread_create() */
+#define PTHREADCB(METHOD) \
+    [] (void *p) -> void* { \
+        reinterpret_cast<decltype(this)>(p)->METHOD(); \
+        return NULL; \
+    }
+
+/* generate callback function (lambda) */
+#define MAKE_CALLBACK(NAME) \
+    static auto NAME##_cb = [] (Fl_Widget *, void *p) { \
+        reinterpret_cast<decltype(this)>(p)->do_##NAME(); \
+    }
+
+/* generate callback function and set callback */
+#define METHODCB(WIDGET, NAME) \
+    do { \
+        MAKE_CALLBACK(NAME); \
+        WIDGET->callback(NAME##_cb, this); \
+    } while (0)
+
+
 enum {
     /* buttons */
     BUT_H          = 28,
@@ -75,26 +96,7 @@ enum {
 };
 
 
-/* inline lambda start routine for pthread_create() */
-#define PTHREADCB(METHOD) \
-    [] (void *p) -> void* { \
-        reinterpret_cast<decltype(this)>(p)->METHOD(); \
-        return NULL; \
-    }
-
-/* generate callback function (lambda) */
-#define MAKE_CALLBACK(NAME) \
-    static auto NAME##_cb = [] (Fl_Widget *, void *p) { \
-        reinterpret_cast<decltype(this)>(p)->do_##NAME(); \
-    }
-
-/* generate callback function and set callback */
-#define METHODCB(WIDGET, NAME) \
-    do { \
-        MAKE_CALLBACK(NAME); \
-        WIDGET->callback(NAME##_cb, this); \
-    } while (0)
-
+static const char *default_title = "simple mkvextract GUI";
 
 
 static inline std::string move_str(char *ptr)
@@ -351,6 +353,22 @@ void MKVextract::do_select_attach()
 
 void MKVextract::do_quit()
 {
+    /* ignore Escape key on main window */
+    if (Fl::event() == FL_SHORTCUT && Fl::event_key() == FL_Escape) {
+        return;
+    }
+
+    /* warn if extraction is still in progress */
+    if (m_th_extract->busy()) {
+        fl_message_title(default_title);
+        int rv = fl_choice("%s", "Cancel", "Close", "Don't close",
+                           "Extraction is still in progress.\n"
+                           "Close the program anyway?");
+        if (rv != 1) {
+            return;
+        }
+    }
+
     stop_threads();
     Fl::hide_all_windows();
 }
@@ -377,7 +395,7 @@ void MKVextract::init_main_window()
     /* main window */
     w = DEFAULT_W;
     h = DEFAULT_H;
-    m_win = new dnd_window(w, h, "simple mkvextract GUI");
+    m_win = new dnd_window(w, h, default_title);
     METHODCB(m_win, quit);
     m_win->dnd(dnd_cb, this);
     m_win->dnd_enabled(true);
@@ -597,7 +615,6 @@ MKVextract::MKVextract(const char *file)
 /* d'tor */
 MKVextract::~MKVextract()
 {
-    stop_threads();
     delete m_th_extract;
     delete m_th_info;
 

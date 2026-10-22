@@ -36,10 +36,9 @@ public:
 
 private:
     pthread_t m_thread;
-    bool m_running = false;
     start_routine_t m_fn;
     void *m_data;
-
+    bool m_init = false;
 
 public:
 
@@ -51,22 +50,25 @@ public:
         stop();
     }
 
+    /* attempt a non-blocking join to check if the thread is still running */
+    bool busy() {
+        return (m_init && pthread_tryjoin_np(m_thread, NULL) == EBUSY);
+    }
+
+    /* don't do anything if a thread is still running */
     void start()
     {
-        /* don't do anything if a thread is still running */
-        if (!m_running && m_fn &&
-            pthread_create(&m_thread, NULL, m_fn, m_data) == 0)
-        {
-            m_running = true;
+        if (!busy() && m_fn && pthread_create(&m_thread, NULL, m_fn, m_data) == 0) {
+            m_init = true;
         }
     }
 
+    /* silently ignores errors if the thread is no longer running */
     void stop()
     {
-        if (m_running) {
+        if (m_init) {
             pthread_cancel(m_thread);
             pthread_join(m_thread, NULL);
-            m_running = false;
         }
     }
 };
