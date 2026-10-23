@@ -75,8 +75,13 @@ struct codec_specs {
 enum {
     INFO_OK,
     INFO_ERROR,
-    INFO_STOP_REQUEST
+    INFO_STOP_REQUEST,
+
+    TRACK_AUDIO,
+    TRACK_VIDEO,
+    TRACK_UNKNOWN
 };
+
 
 
 /* count objects in array */
@@ -132,7 +137,7 @@ static std::string human_readable_size(std::string &line)
 }
 
 
-static inline bool find(const std::string &haystack, char needle, size_t &pos) {
+static bool find(const std::string &haystack, char needle, size_t &pos) {
     return ((pos = haystack.find(needle)) != std::string::npos);
 }
 
@@ -152,7 +157,7 @@ static void get_fps_value(std::string &line)
 
 
 /* check if line begins with str, removes str if true */
-static inline bool match(std::string &line, const std::string_view &str)
+static bool match(std::string &line, const std::string_view &str)
 {
     if (line.starts_with(str)) {
         line.erase(0, str.size());
@@ -176,6 +181,68 @@ static const char *type_string(char type)
     default:
         return "other";
     }
+}
+
+
+static bool parse_track_data(std::string &line,
+                             std::vector<struct track_info> &tracks,
+                             unsigned short &entry)
+{
+    if (line == "| + Track") {
+        struct track_info track_info = { .lang = "UND" };
+        tracks.push_back(track_info);
+        entry = TRACK_UNKNOWN;
+    }
+    else if (match(line, "|  + Codec ID: ")) {
+        tracks.back().codec = line;
+    }
+    else if (match(line, "|  + Default duration: ")) {
+        get_fps_value(line);
+        tracks.back().fps = line;
+    }
+    else if (match(line, "|  + Name: ")) {
+        tracks.back().name = line;
+    }
+    else if (match(line, "|  + Language: ")) {
+        for (auto &c : line) { c = toupper(c); }
+        tracks.back().lang = line;
+    }
+    else if (line.starts_with("|+")) {
+        /* end of track entries */
+        return false;
+    }
+    else if (entry == TRACK_UNKNOWN) {
+        if (match(line, "|  + Audio track")) {
+            entry = TRACK_AUDIO;
+        } else if (match(line, "|  + Video track")) {
+            entry = TRACK_VIDEO;
+        }
+    }
+    else if (entry == TRACK_VIDEO) {
+        if (match(line, "|   + Pixel width: ")) {
+            tracks.back().w = line;
+        } else if (match(line, "|   + Pixel height: ")) {
+            tracks.back().h = line;
+        }
+    }
+    else if (entry == TRACK_AUDIO) {
+        if (match(line, "|   + Channels: ")) {
+            if (line == "2") {
+                line = "stereo";
+            } else {
+                line += " channels";
+            }
+            tracks.back().channels = line;
+        }
+        else if (match(line, "|   + Sampling frequency: ")) {
+            tracks.back().freq = line;
+        } else {
+            /* no entry means mono */
+            tracks.back().channels = "mono";
+        }
+    }
+
+    return true;
 }
 
 
@@ -247,21 +314,37 @@ void MKVextract::run_mkvinfo(std::stop_token stoken)
 }
 
 
-/* return early if a stop was requested */
-#define CHECK_STOP_REQUEST() \
-    do { \
-        if (stoken.stop_requested()) { \
-            return INFO_STOP_REQUEST; \
-        } \
-    } while(0)
-
-
 /* read output of mkvinfo */
 int MKVextract::parse_mkvinfo(std::stop_token &stoken, std::string &error)
 {
     std::ifstream ifs;
     std::vector<struct track_info> tracks;
     std::vector<struct attachment_info> attach;
+
+    unsigned short track_entry = TRACK_UNKNOWN;
+    bool has_chapters = false;
+    bool has_tracks = false;
+    std::string line;
+    int rv = INFO_OK;
+
+    /* perform these checks at the top of each while loop */
+    auto return_from_loop = [&] ()
+    {
+        /* multithreading stop was requested */
+        if (stoken.stop_requested()) {
+            rv = INFO_STOP_REQUEST;
+            return true;
+        }
+
+        /* mkvinfo has returned an error message */
+        if (!line.starts_with('+') && !line.starts_with('|')) {
+            error = line;
+            rv = INFO_ERROR;
+            return true;
+        }
+
+        return false;
+    };
 
     error.clear();
 
@@ -270,6 +353,12 @@ int MKVextract::parse_mkvinfo(std::stop_token &stoken, std::string &error)
         return INFO_ERROR;
     }
 
+    /* check before starting a pipe */
+    if (stoken.stop_requested()) {
+        return INFO_STOP_REQUEST;
+    }
+
+    /* run mkvinfo */
     const char *args[] = {
         "mkvinfo",
         "--no-bom",
@@ -280,10 +369,6 @@ int MKVextract::parse_mkvinfo(std::stop_token &stoken, std::string &error)
         NULL
     };
 
-    /* check before starting a pipe */
-    CHECK_STOP_REQUEST();
-
-    /* run mkvinfo */
     pipe_command cmd(args, count_of(args));
 
     if (!cmd.open_pipe()) {
@@ -291,22 +376,14 @@ int MKVextract::parse_mkvinfo(std::stop_token &stoken, std::string &error)
         return INFO_ERROR;
     }
 
-    enum { tnone = 0, tvideo = 1, taudio = 2 };
-    unsigned short track_entry = tnone;
-    bool has_chapters = false;
-    bool has_tracks = false;
-    std::string line;
-
-    /* find begin of tracks info */
+    /* find tracks info */
     while (cmd.getline(line)) {
-        CHECK_STOP_REQUEST();
-
-        if (line == "|+ Tracks") {
+        if (return_from_loop()) {
+            return rv;
+        } else if (line == "|+ Tracks") {
+            /* begin of track entries */
             has_tracks = true;
             break;
-        } else if (!line.starts_with('+') && !line.starts_with('|')) {
-            error = line;
-            return INFO_ERROR;
         }
     }
 
@@ -317,104 +394,28 @@ int MKVextract::parse_mkvinfo(std::stop_token &stoken, std::string &error)
 
     /* parse tracks */
     while (cmd.getline(line)) {
-        CHECK_STOP_REQUEST();
-
-        if (!line.starts_with('+') && !line.starts_with('|')) {
-            error = line;
-            return INFO_ERROR;
-        }
-
-        if (line == "| + Track") {
-            struct track_info track_info = { .lang = "UND" };
-            tracks.push_back(track_info);
-            track_entry = tnone;
-            continue;
-        }
-        else if (match(line, "|  + Codec ID: ")) {
-            tracks.back().codec = line;
-            continue;
-        }
-        else if (match(line, "|  + Default duration: ")) {
-            get_fps_value(line);
-            tracks.back().fps = line;
-            continue;
-        }
-        else if (match(line, "|  + Name: ")) {
-            tracks.back().name = line;
-            continue;
-        }
-        else if (match(line, "|  + Language: ")) {
-            for (auto &c : line) { c = toupper(c); }
-            tracks.back().lang = line;
-            continue;
-        }
-        else if (line.starts_with("|+")) {
+        if (return_from_loop()) {
+            return rv;
+        } else if (!parse_track_data(line, tracks, track_entry)) {
             /* end of track entries */
             break;
-        }
-
-        if (track_entry == tnone) {
-            if (match(line, "|  + Audio track")) {
-                track_entry = taudio;
-                continue;
-            }
-            else if (match(line, "|  + Video track")) {
-                track_entry = tvideo;
-                continue;
-            }
-        }
-        else if (track_entry == tvideo) {
-            if (match(line, "|   + Pixel width: ")) {
-                tracks.back().w = line;
-                continue;
-            }
-            else if (match(line, "|   + Pixel height: ")) {
-                tracks.back().h = line;
-                continue;
-            }
-        }
-        else if (track_entry == taudio) {
-            if (match(line, "|   + Channels: ")) {
-                if (line == "2") {
-                    line = "stereo";
-                } else {
-                    line += " channels";
-                }
-                tracks.back().channels = line;
-                continue;
-            }
-            else if (match(line, "|   + Sampling frequency: ")) {
-                tracks.back().freq = line;
-                continue;
-            } else {
-                /* no entry means mono */
-                tracks.back().channels = "mono";
-                continue;
-            }
         }
     }
 
     /* parse attachments and chapters */
     while (cmd.getline(line)) {
-        CHECK_STOP_REQUEST();
-
-        if (!line.starts_with('+') && !line.starts_with('|')) {
-            error = line;
-            return INFO_ERROR;
+        if (return_from_loop()) {
+            return rv;
         }
-
-        if (line == "| + Attached") {
+        else if (line == "| + Attached") {
             struct attachment_info info;
             attach.push_back(info);
-            continue;
         }
         else if (match(line, "|  + File name: ")) {
             attach.back().name = line;
-            continue;
         }
         else if (match(line, "|  + File data: size ")) {
             attach.back().size = human_readable_size(line);
-            continue;
         }
         else if (line == "|+ Chapters") {
             has_chapters = true;
@@ -427,6 +428,12 @@ int MKVextract::parse_mkvinfo(std::stop_token &stoken, std::string &error)
         return INFO_ERROR;
     }
 
+    /* last check; from here on the browser and
+     * member variables are updated */
+    if (stoken.stop_requested()) {
+        return INFO_STOP_REQUEST;
+    }
+
     /* update browser */
     Fl::lock();
     m_browser->clear();
@@ -436,8 +443,6 @@ int MKVextract::parse_mkvinfo(std::stop_token &stoken, std::string &error)
 
     /* tracks */
     for (size_t i = 0; i < tracks.size(); i++) {
-        CHECK_STOP_REQUEST();
-
         std::stringstream e; /* browser entry */
         std::stringstream filename;
         char c = tracks.at(i).codec[0];
@@ -462,8 +467,6 @@ int MKVextract::parse_mkvinfo(std::stop_token &stoken, std::string &error)
 
         /* append the correct file extension depending on the codec ID */
         for (const auto &codec : mkv_codec_list) {
-            CHECK_STOP_REQUEST();
-
             if (tracks.at(i).codec == codec.id) {
                 filename << '.' << codec.ext;
                 break;
@@ -479,8 +482,6 @@ int MKVextract::parse_mkvinfo(std::stop_token &stoken, std::string &error)
 
     /* attachments */
     for (size_t i = 0; i < attach.size(); i++) {
-        CHECK_STOP_REQUEST();
-
         std::stringstream e; /* browser entry */
         e << "Attachment " << i+1 << ": " << attach.at(i).name;
         e << " [" << attach.at(i).size << "]";
