@@ -39,24 +39,20 @@
 #include <FL/filename.H>
 #include <FL/fl_ask.H>
 
+#include <semaphore>
 #include <sstream>
+#include <stop_token>
 #include <string>
+#include <thread>
 #include <utility>
 
 #include "check_browser.hpp"
 #include "dnd_window.hpp"
 #include "fnfc.hpp"
-#include "posix_thread.hpp"
 #include "rotate_box.hpp"
 #include "mkvextract.hpp"
 
 
-/* inline lambda start routine for pthread_create() */
-#define PTHREADCB(METHOD) \
-    [] (void *p) -> void* { \
-        reinterpret_cast<decltype(this)>(p)->METHOD(); \
-        return NULL; \
-    }
 
 /* generate callback function (lambda) */
 #define MAKE_CALLBACK(NAME) \
@@ -99,37 +95,81 @@ enum {
 static const char *default_title = "simple mkvextract GUI";
 
 
-static inline std::string move_str(char *ptr)
-{
+/* char pointer to std::string helpers */
+
+static std::string move_str(char *ptr) {
     std::string s = ptr;
     free(ptr);
-
     return s;
 }
 
-
-static inline std::string absolute_str(const char *file)
+static std::string absolute_str(const char *file)
 {
     if (!file || !*file) {
         return "";
     }
 
     char *ptr = realpath(file, NULL);
-
     return ptr ? move_str(ptr) : file;
 }
 
-
-static inline std::string get_cwd_str()
-{
+static std::string get_cwd_str() {
     char *ptr = get_current_dir_name();
-
     return ptr ? move_str(ptr) : absolute_str(".");
+}
+
+
+/* multithreading */
+
+void MKVextract::start_info_thread() {
+    m_th_info = new std::jthread([this] (std::stop_token stoken) {
+        run_mkvinfo(stoken);
+    });
+}
+
+
+void MKVextract::start_extract_thread()
+{
+    m_th_extract = new std::jthread([this] (std::stop_token stoken) {
+        m_extract_semaphore.acquire();
+        run_mkvextract(stoken);
+        m_extract_semaphore.release();
+    });
+}
+
+
+/* automatic stop and join through destructors */
+void MKVextract::stop_and_delete_threads()
+{
+    if (m_th_extract) {
+        delete m_th_extract;
+        m_th_extract = NULL;
+    }
+
+    if (m_th_info) {
+        delete m_th_info;
+        m_th_info = NULL;
+    }
+}
+
+
+/* try_acquire() fails without blocking if semaphore is
+ * still in use by the extraction thread */
+bool MKVextract::extraction_in_progress()
+{
+    if (m_extract_semaphore.try_acquire()) {
+        m_extract_semaphore.release();
+        return false;
+    }
+
+    return true;
 }
 
 
 void MKVextract::restore_main_window()
 {
+    m_rotate->stop();
+
     m_but_outdir->activate();
     m_but_add->activate();
 
@@ -139,10 +179,10 @@ void MKVextract::restore_main_window()
     m_but_extract->activate();
     m_but_extract->show();
 
-    m_win->dnd_enabled(true);
     m_use_source_path->activate();
-    m_rotate->stop();
+    do_check_outdir();
 
+    m_win->dnd_enabled(true);
     m_win->redraw();
 }
 
@@ -176,11 +216,9 @@ void MKVextract::do_dnd()
         return;
     }
 
-    stop_threads();
-
-    /* get file infos */
+    stop_and_delete_threads();
     m_file = std::move(str);
-    m_th_info->start();
+    start_info_thread();
 }
 
 
@@ -215,9 +253,9 @@ void MKVextract::do_open_file()
     const char *file = fc.select();
 
     if (file && *file) {
-        stop_threads();
+        stop_and_delete_threads();
         m_file = file;
-        m_th_info->start();
+        start_info_thread();
     }
 }
 
@@ -247,18 +285,16 @@ void MKVextract::do_cmd()
 
 void MKVextract::do_extract()
 {
-    stop_threads();
+    stop_and_delete_threads();
     m_cmd->hide();
     m_win->redraw();
-
-    /* start extraction */
-    m_th_extract->start();
+    start_extract_thread();
 }
 
 
 void MKVextract::do_abort()
 {
-    stop_threads();
+    stop_and_delete_threads();
     m_progress_box->label("STOPPED");
     restore_main_window();
 }
@@ -359,7 +395,7 @@ void MKVextract::do_quit()
     }
 
     /* warn if extraction is still in progress */
-    if (m_th_extract->busy()) {
+    if (extraction_in_progress()) {
         fl_message_title(default_title);
         int rv = fl_choice("%s", "Cancel", "Close", "Don't close",
                            "Extraction is still in progress.\n"
@@ -369,7 +405,8 @@ void MKVextract::do_quit()
         }
     }
 
-    stop_threads();
+    stop_and_delete_threads();
+
     Fl::hide_all_windows();
 }
 
@@ -591,6 +628,9 @@ void MKVextract::init_cmd_window()
 
 /* c'tor */
 MKVextract::MKVextract(const char *file)
+: m_extract_semaphore(1),
+  m_th_extract(NULL),
+  m_th_info(NULL)
 {
     /* set input file */
     m_file = absolute_str(file);
@@ -602,10 +642,6 @@ MKVextract::MKVextract(const char *file)
         m_outdir_manual += '/';
     }
 
-    /* multithreading */
-    m_th_extract = new posix_thread (PTHREADCB(run_mkvextract), this);
-    m_th_info = new posix_thread (PTHREADCB(run_mkvinfo), this);
-
     /* init windows */
     init_main_window();
     init_cmd_window();
@@ -615,8 +651,7 @@ MKVextract::MKVextract(const char *file)
 /* d'tor */
 MKVextract::~MKVextract()
 {
-    delete m_th_extract;
-    delete m_th_info;
+    stop_and_delete_threads();
 
     delete m_cmd;
     delete m_win;
@@ -641,7 +676,7 @@ void MKVextract::show()
     Fl::lock();
 
     if (!m_file.empty()) {
-        m_th_info->start();
+        start_info_thread();
     }
 }
 

@@ -40,7 +40,7 @@
 #include "mkvextract.hpp"
 
 
-void MKVextract::run_mkvextract()
+void MKVextract::run_mkvextract(std::stop_token &stoken)
 {
     std::string base, xml, ogm;
 
@@ -54,6 +54,10 @@ void MKVextract::run_mkvextract()
         Fl::unlock();
         Fl::awake();
 
+        return;
+    }
+
+    if (stoken.stop_requested()) {
         return;
     }
 
@@ -94,6 +98,10 @@ void MKVextract::run_mkvextract()
     std::string line;
 
     while (cmd.getline(line)) {
+        if (stoken.stop_requested()) {
+            return;
+        }
+
         if (line.starts_with(gui_progress)) {
             Fl::lock();
             m_progress_box->copy_label(line.c_str() + gui_progress.size());
@@ -122,6 +130,10 @@ void MKVextract::run_mkvextract()
     restore_main_window();
     Fl::unlock();
     Fl::awake();
+
+    if (stoken.stop_requested()) {
+        return;
+    }
 
     /* convert extracted chapters from XML to OGM format */
     if (m_chapters_entry != 0 && m_browser->checked(m_chapters_entry)) {

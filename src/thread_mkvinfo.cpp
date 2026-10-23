@@ -38,6 +38,7 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <stop_token>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -71,12 +72,21 @@ struct codec_specs {
 };
 
 
+enum {
+    INFO_OK,
+    INFO_ERROR,
+    INFO_STOP_REQUEST
+};
+
+
+/* count objects in array */
 template <typename T, size_t N>
 size_t count_of(T(&)[N]) {
     return std::extent<T[N]>::value;
 }
 
 
+/* list of codec IDs and file extensions */
 static struct codec_specs mkv_codec_list[] =
 {
 #include "codecs.i"
@@ -169,7 +179,7 @@ static const char *type_string(char type)
 }
 
 
-void MKVextract::run_mkvinfo()
+void MKVextract::run_mkvinfo(std::stop_token stoken)
 {
     std::string error;
 
@@ -179,7 +189,11 @@ void MKVextract::run_mkvinfo()
     Fl::unlock();
     Fl::awake();
 
-    if (!parse_mkvinfo(error)) {
+    /* run mkvinfo and parse the output */
+    int rv = parse_mkvinfo(stoken, error);
+
+    if (rv == INFO_ERROR) {
+        /* mkvinfo has returned with an error */
         utils::fold_text(error);
 
         Fl::lock();
@@ -193,6 +207,8 @@ void MKVextract::run_mkvinfo()
         Fl::awake();
 
         return;
+    } else if (rv == INFO_STOP_REQUEST) {
+        return; /* multithreading stop was requested */
     }
 
     /* save input file's dirname */
@@ -231,8 +247,17 @@ void MKVextract::run_mkvinfo()
 }
 
 
+/* return early if a stop was requested */
+#define CHECK_STOP_REQUEST() \
+    do { \
+        if (stoken.stop_requested()) { \
+            return INFO_STOP_REQUEST; \
+        } \
+    } while(0)
+
+
 /* read output of mkvinfo */
-bool MKVextract::parse_mkvinfo(std::string &error)
+int MKVextract::parse_mkvinfo(std::stop_token &stoken, std::string &error)
 {
     std::ifstream ifs;
     std::vector<struct track_info> tracks;
@@ -242,7 +267,7 @@ bool MKVextract::parse_mkvinfo(std::string &error)
 
     if (!utils::command_in_path("mkvinfo")) {
         error = "mkvinfo doesn't seem to be in PATH!";
-        return false;
+        return INFO_ERROR;
     }
 
     const char *args[] = {
@@ -255,12 +280,15 @@ bool MKVextract::parse_mkvinfo(std::string &error)
         NULL
     };
 
+    /* check before starting a pipe */
+    CHECK_STOP_REQUEST();
+
     /* run mkvinfo */
     pipe_command cmd(args, count_of(args));
 
     if (!cmd.open_pipe()) {
         error = "cannot read output from mkvinfo";
-        return false;
+        return INFO_ERROR;
     }
 
     enum { tnone = 0, tvideo = 1, taudio = 2 };
@@ -271,25 +299,29 @@ bool MKVextract::parse_mkvinfo(std::string &error)
 
     /* find begin of tracks info */
     while (cmd.getline(line)) {
+        CHECK_STOP_REQUEST();
+
         if (line == "|+ Tracks") {
             has_tracks = true;
             break;
         } else if (!line.starts_with('+') && !line.starts_with('|')) {
             error = line;
-            return false;
+            return INFO_ERROR;
         }
     }
 
     if (!has_tracks) {
         error = "no tracks found";
-        return false;
+        return INFO_ERROR;
     }
 
     /* parse tracks */
     while (cmd.getline(line)) {
+        CHECK_STOP_REQUEST();
+
         if (!line.starts_with('+') && !line.starts_with('|')) {
             error = line;
-            return false;
+            return INFO_ERROR;
         }
 
         if (line == "| + Track") {
@@ -364,9 +396,11 @@ bool MKVextract::parse_mkvinfo(std::string &error)
 
     /* parse attachments and chapters */
     while (cmd.getline(line)) {
+        CHECK_STOP_REQUEST();
+
         if (!line.starts_with('+') && !line.starts_with('|')) {
             error = line;
-            return false;
+            return INFO_ERROR;
         }
 
         if (line == "| + Attached") {
@@ -390,7 +424,7 @@ bool MKVextract::parse_mkvinfo(std::string &error)
 
     if (cmd.error()) {
         error = line;
-        return false;
+        return INFO_ERROR;
     }
 
     /* update browser */
@@ -402,6 +436,8 @@ bool MKVextract::parse_mkvinfo(std::string &error)
 
     /* tracks */
     for (size_t i = 0; i < tracks.size(); i++) {
+        CHECK_STOP_REQUEST();
+
         std::stringstream e; /* browser entry */
         std::stringstream filename;
         char c = tracks.at(i).codec[0];
@@ -426,6 +462,8 @@ bool MKVextract::parse_mkvinfo(std::string &error)
 
         /* append the correct file extension depending on the codec ID */
         for (const auto &codec : mkv_codec_list) {
+            CHECK_STOP_REQUEST();
+
             if (tracks.at(i).codec == codec.id) {
                 filename << '.' << codec.ext;
                 break;
@@ -441,6 +479,8 @@ bool MKVextract::parse_mkvinfo(std::string &error)
 
     /* attachments */
     for (size_t i = 0; i < attach.size(); i++) {
+        CHECK_STOP_REQUEST();
+
         std::stringstream e; /* browser entry */
         e << "Attachment " << i+1 << ": " << attach.at(i).name;
         e << " [" << attach.at(i).size << "]";
@@ -483,6 +523,6 @@ bool MKVextract::parse_mkvinfo(std::string &error)
 
     Fl::awake();
 
-    return true;
+    return INFO_OK;
 }
 

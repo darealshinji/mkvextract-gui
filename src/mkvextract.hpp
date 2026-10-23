@@ -26,9 +26,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <semaphore>
+#include <stop_token>
 #include <string>
+#include <thread>
 #include <vector>
-#include "posix_thread.hpp"
 
 class Fl_Box;
 class Fl_Button;
@@ -60,13 +62,20 @@ private:
     std::vector<std::string> m_args;
 
     /* mkvextract/mkvinfo */
-    void run_mkvextract();
-    void run_mkvinfo();
-    bool parse_mkvinfo(std::string &error);
+    void run_mkvextract(std::stop_token &stoken);
+    void run_mkvinfo(std::stop_token stoken);
+    int parse_mkvinfo(std::stop_token &stoken, std::string &error);
+
+    /* multithreading */
+    std::binary_semaphore m_extract_semaphore;
+    std::jthread *m_th_extract;
+    std::jthread *m_th_info;
+    void start_info_thread();
+    void start_extract_thread();
+    bool extraction_in_progress();
+    void stop_and_delete_threads();
 
     /* these objects must be deleted in the d'tor */
-    posix_thread *m_th_info;
-    posix_thread *m_th_extract;
     dnd_window *m_win;
     Fl_Double_Window *m_cmd;
     Fl_Text_Buffer *m_txtbuf;
@@ -110,11 +119,6 @@ private:
     void restore_main_window();
     void init_main_window();
     void init_cmd_window();
-
-    void stop_threads() {
-        m_th_extract->stop();
-        m_th_info->stop();
-    }
 
 
 public:
