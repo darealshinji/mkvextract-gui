@@ -279,11 +279,7 @@ void MKVextract::run_mkvinfo(std::stop_token stoken)
     }
 
     /* save input file's dirname */
-    m_outdir_source = std::filesystem::path(m_file).parent_path().string();
-
-    if (!m_outdir_source.ends_with('/')) {
-        m_outdir_source += '/';
-    }
+    m_outdir_source = m_file.parent_path();
 
     Fl::lock();
 

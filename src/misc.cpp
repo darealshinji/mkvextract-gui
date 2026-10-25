@@ -32,14 +32,12 @@
 
 #include "mkvextract.hpp"
 
-namespace fs = std::filesystem;
-
 
 
 /* output path + input file stem name */
 std::string MKVextract::stem_path()
 {
-    std::string path;
+    fs::path path;
 
     if (m_use_source_path->value() == true) {
         path = m_outdir_source;
@@ -47,9 +45,9 @@ std::string MKVextract::stem_path()
         path = m_outdir_manual;
     }
 
-    path += fs::path(m_file).stem().string();
+    path /= m_file.stem();
 
-    return path;
+    return path.string();
 }
 
 

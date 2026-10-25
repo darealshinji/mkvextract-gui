@@ -39,6 +39,7 @@
 #include <FL/filename.H>
 #include <FL/fl_ask.H>
 
+#include <filesystem>
 #include <semaphore>
 #include <sstream>
 #include <stop_token>
@@ -93,30 +94,6 @@ enum {
 
 
 static const char *default_title = "simple mkvextract GUI";
-
-
-/* char pointer to std::string helpers */
-
-static std::string move_str(char *ptr) {
-    std::string s = ptr;
-    free(ptr);
-    return s;
-}
-
-static std::string absolute_str(const char *file)
-{
-    if (!file || !*file) {
-        return "";
-    }
-
-    char *ptr = realpath(file, NULL);
-    return ptr ? move_str(ptr) : file;
-}
-
-static std::string get_cwd_str() {
-    char *ptr = get_current_dir_name();
-    return ptr ? move_str(ptr) : absolute_str(".");
-}
 
 
 /* multithreading */
@@ -203,21 +180,15 @@ void MKVextract::do_dnd()
     }
 
     /* copy first item, without newline */
-    std::string str(text, p - text);
+    std::string item(text, p - text);
 
-    if (str.starts_with("file://")) {
-        /* decode URI in place */
-        str.erase(0, 7);
-        fl_decode_uri(std::data(str));
-    }
-
-    if (!str.starts_with('/')) {
-        /* not a full path */
-        return;
+    if (item.starts_with("file://")) {
+        item.erase(0, 7);
+        fl_decode_uri(std::data(item));
     }
 
     stop_and_delete_threads();
-    m_file = std::move(str);
+    m_file = fs::absolute(item);
     start_info_thread();
 }
 
@@ -234,12 +205,7 @@ void MKVextract::do_set_outdir()
     }
 
     m_outdir_manual = dir;
-
-    if (!m_outdir_manual.ends_with('/')) {
-        m_outdir_manual += '/';
-    }
-
-    m_outdir_field->label(m_outdir_manual.c_str());
+    m_outdir_field->copy_label(m_outdir_manual.c_str());
     m_outdir_field->activate();
     m_use_source_path->clear();
 }
@@ -254,7 +220,7 @@ void MKVextract::do_open_file()
 
     if (file && *file) {
         stop_and_delete_threads();
-        m_file = file;
+        m_file = fs::absolute(file);
         start_info_thread();
     }
 }
@@ -304,11 +270,11 @@ void MKVextract::do_check_outdir()
 {
     if (m_use_source_path->value() == true) {
         /* same as input file directory */
-        m_outdir_field->label(m_outdir_source.c_str());
+        m_outdir_field->copy_label(m_outdir_source.c_str());
         m_outdir_field->deactivate();
     } else {
         /* manually selected output directory */
-        m_outdir_field->label(m_outdir_manual.c_str());
+        m_outdir_field->copy_label(m_outdir_manual.c_str());
         m_outdir_field->activate();
     }
 }
@@ -396,11 +362,11 @@ void MKVextract::do_quit()
 
     /* warn if extraction is still in progress */
     if (extraction_in_progress()) {
+        const char *msg = "Extraction is still in progress.\nClose the program anyway?";
+
         fl_message_title(default_title);
-        int rv = fl_choice("%s", "Cancel", "Close", "Don't close",
-                           "Extraction is still in progress.\n"
-                           "Close the program anyway?");
-        if (rv != 1) {
+
+        if (fl_choice("%s", "Cancel", "Close", "Don't close", msg) != 1) {
             return;
         }
     }
@@ -537,7 +503,7 @@ void MKVextract::init_main_window()
             w = g_prog->w() - 10;
             h = BUT_H;
             m_outdir_field = new Fl_Box(FL_THIN_DOWN_BOX, x, y, w, h, NULL);
-            m_outdir_field->label(m_outdir_manual.c_str());
+            m_outdir_field->copy_label(m_outdir_manual.c_str());
             m_outdir_field->align(left_align);
 
             /* "Source path" check button */
@@ -632,15 +598,11 @@ MKVextract::MKVextract(const char *file)
   m_th_extract(NULL),
   m_th_info(NULL)
 {
-    /* set input file */
-    m_file = absolute_str(file);
-
-    /* set destination to current working directory */
-    m_outdir_manual = get_cwd_str();
-
-    if (!m_outdir_manual.ends_with('/')) {
-        m_outdir_manual += '/';
+    if (file && *file) {
+        m_file = fs::absolute(file);
     }
+
+    m_outdir_manual = fs::current_path();
 
     /* init windows */
     init_main_window();

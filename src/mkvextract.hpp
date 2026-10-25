@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include <filesystem>
 #include <stdio.h>
 #include <stdlib.h>
 #include <semaphore>
@@ -31,6 +32,8 @@
 #include <string>
 #include <thread>
 #include <vector>
+
+namespace fs = std::filesystem;
 
 class Fl_Box;
 class Fl_Button;
@@ -58,7 +61,7 @@ private:
     std::vector<int> m_timestampIDs;
     std::vector<std::string> m_outnames;
 
-    std::string m_file, m_outdir_source, m_outdir_manual;
+    fs::path m_file, m_outdir_source, m_outdir_manual;
     std::vector<std::string> m_args;
 
     /* mkvextract/mkvinfo */
