@@ -90,8 +90,8 @@ int main(int argc, char *argv[])
     print_infos();
     set_default_icon();
 
-    MKVextract ex(argc > 1 ? argv[1] : NULL);
-    ex.show();
+    MKVextract ex;
+    ex.show(argc > 1 ? argv[1] : NULL);
 
     return Fl::run();
 }

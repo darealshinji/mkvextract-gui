@@ -73,7 +73,7 @@ private:
     std::binary_semaphore m_extract_semaphore;
     std::jthread *m_th_extract;
     std::jthread *m_th_info;
-    void start_info_thread();
+    void start_info_thread(const char *file);
     void start_extract_thread();
     bool extraction_in_progress();
     void stop_and_delete_threads();
@@ -126,10 +126,10 @@ private:
 
 public:
 
-    MKVextract(const char *file);
+    MKVextract();
     ~MKVextract();
 
-    void show();
+    void show(const char *file);
 };
 
 

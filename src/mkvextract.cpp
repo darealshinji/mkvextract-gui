@@ -98,7 +98,16 @@ static const char *default_title = "simple mkvextract GUI";
 
 /* multithreading */
 
-void MKVextract::start_info_thread() {
+void MKVextract::start_info_thread(const char *file)
+{
+    if (!file || !*file) {
+        return;
+    }
+
+    stop_and_delete_threads();
+
+    m_file = fs::absolute(file);
+
     m_th_info = new std::jthread([this] (std::stop_token stoken) {
         run_mkvinfo(stoken);
     });
@@ -107,6 +116,8 @@ void MKVextract::start_info_thread() {
 
 void MKVextract::start_extract_thread()
 {
+    stop_and_delete_threads();
+
     m_th_extract = new std::jthread([this] (std::stop_token stoken) {
         m_extract_semaphore.acquire();
         run_mkvextract(stoken);
@@ -187,9 +198,7 @@ void MKVextract::do_dnd()
         fl_decode_uri(std::data(item));
     }
 
-    stop_and_delete_threads();
-    m_file = fs::absolute(item);
-    start_info_thread();
+    start_info_thread(item.c_str());
 }
 
 
@@ -216,13 +225,7 @@ void MKVextract::do_open_file()
     FNFC fc(FNFC::BROWSE_FILE, "Select a file");
     fc.filter("Matroska\t*.mkv,*.mka,*.mks,*.mk3d,*.webm");
 
-    const char *file = fc.select();
-
-    if (file && *file) {
-        stop_and_delete_threads();
-        m_file = fs::absolute(file);
-        start_info_thread();
-    }
+    start_info_thread(fc.select());
 }
 
 
@@ -240,20 +243,21 @@ void MKVextract::do_cmd()
 {
     create_cmd(CREATE_TEXTBUFFER);
 
-    /* resize window to default and
-     * position at center above main window */
-    int x = m_win->x() + ((m_win->w() - CMD_W) / 2);
-    int y = m_win->y() + ((m_win->h() - CMD_H) / 2);
-    m_cmd->resize(x, y, CMD_W, CMD_H);
+    if (!m_cmd->shown()) {
+        /* resize window to default and
+         * position at center above main window */
+        int x = m_win->x() + ((m_win->w() - CMD_W) / 2);
+        int y = m_win->y() + ((m_win->h() - CMD_H) / 2);
+        m_cmd->resize(x, y, CMD_W, CMD_H);
+    }
+
     m_cmd->show();
 }
 
 
 void MKVextract::do_extract()
 {
-    stop_and_delete_threads();
     m_cmd->hide();
-    m_win->redraw();
     start_extract_thread();
 }
 
@@ -324,6 +328,11 @@ void MKVextract::do_update_browser()
             sel_attach->deactivate();
         }
     }
+
+    /* update command window */
+    if (m_cmd->shown()) {
+        create_cmd(CREATE_TEXTBUFFER);
+    }
 }
 
 
@@ -370,8 +379,6 @@ void MKVextract::do_quit()
             return;
         }
     }
-
-    stop_and_delete_threads();
 
     Fl::hide_all_windows();
 }
@@ -593,15 +600,11 @@ void MKVextract::init_cmd_window()
 
 
 /* c'tor */
-MKVextract::MKVextract(const char *file)
+MKVextract::MKVextract()
 : m_extract_semaphore(1),
   m_th_extract(NULL),
   m_th_info(NULL)
 {
-    if (file && *file) {
-        m_file = fs::absolute(file);
-    }
-
     m_outdir_manual = fs::current_path();
 
     /* init windows */
@@ -621,7 +624,7 @@ MKVextract::~MKVextract()
 }
 
 
-void MKVextract::show()
+void MKVextract::show(const char *file)
 {
     if (m_win->shown()) {
         return;
@@ -637,8 +640,6 @@ void MKVextract::show()
 
     Fl::lock();
 
-    if (!m_file.empty()) {
-        start_info_thread();
-    }
+    start_info_thread(file);
 }
 
