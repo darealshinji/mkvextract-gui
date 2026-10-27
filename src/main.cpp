@@ -25,10 +25,10 @@
 #include <FL/Fl.H>
 #include <FL/Fl_Double_Window.H>
 #include <FL/Fl_PNG_Image.H>
+#include <FL/Fl_Scheme.H>
 
-#include <array>
 #include <iostream>
-#include <string.h>
+#include <string>
 
 #include "mkvextract.hpp"
 
@@ -39,23 +39,27 @@
 #endif
 
 
+static const char *default_scheme = "gtk+";
+
+
 static void set_default_icon()
 {
-    const std::array<const char *, 6> paths = {
+    const char *list[] = {
         "/usr/share/icons/hicolor/256x256/apps/mkvextract.png",
         "/usr/share/icons/hicolor/128x128/apps/mkvextract.png",
         "/usr/share/icons/hicolor/64x64/apps/mkvextract.png",
         "/usr/share/icons/hicolor/48x48/apps/mkvextract.png",
         "/usr/share/icons/hicolor/32x32/apps/mkvextract.png",
-        "/usr/share/pixmaps/mkvextract.png"
+        "/usr/share/pixmaps/mkvextract.png",
+        NULL
     };
 
-    for (auto &e : paths) {
-        Fl_PNG_Image icon(e);
+    for (auto p = list; *p; p++) {
+        Fl_PNG_Image icon(*p);
 
         if (!icon.fail()) {
             Fl_Double_Window::default_icon(&icon);
-            break;
+            return;
         }
     }
 }
@@ -69,10 +73,10 @@ static void print_infos()
 #ifdef FLTK_VERSION
     std::cout << FLTK_VERSION;
 #else
-    const int version = Fl::api_version();
-    const int major = version / 10000;
-    const int minor = (version % 10000) / 100;
-    const int patch = version % 100;
+    int version = Fl::api_version();
+    int major = version / 10000;
+    int minor = (version % 10000) / 100;
+    int patch = version % 100;
     std::cout << major << "." << minor << "." << patch;
 #endif
 
@@ -80,18 +84,57 @@ static void print_infos()
 }
 
 
-int main(int argc, char *argv[])
+static void print_help(const char *prog)
 {
-    if (argc > 1 && strcmp(argv[1], "--help") == 0) {
-        std::cout << "usage: " << argv[0] << " [FILE]" << std::endl;
-        return 0;
+    std::cout << "usage:\n"
+        << prog << " -help\n"
+        << prog << " [-s scheme] [-dc|-default-colors] file.mkv\n"
+        << "schemes:";
+
+    auto names = Fl_Scheme::names();
+
+    for (int i = 0; i < Fl_Scheme::num_schemes(); i++) {
+        std::cout << ' ' << names[i];
+    }
+
+    std::cout << " (default: " << default_scheme << ")" << std::endl;
+}
+
+
+int main(int argc, char **argv)
+{
+    /* use GTK+ scheme and system colors by default */
+    const char *scheme = default_scheme;
+    bool default_colors = false;
+
+    const char *file = NULL;
+
+    for (int i = 1; i < argc; i++) {
+        std::string arg{argv[i]};
+
+        if (arg == "-help" || arg == "--help") {
+            print_help(argv[0]);
+            return 0;
+        } else if (arg == "-dc" || arg == "-default-colors") {
+            default_colors = true;
+        } else if (arg == "-s" && (i+1) < argc) {
+            scheme = argv[++i];
+        } else {
+            file = argv[i];
+        }
     }
 
     print_infos();
     set_default_icon();
 
+    Fl::scheme(scheme);
+
+    if (!default_colors) {
+        Fl::get_system_colors();
+    }
+
     MKVextract ex;
-    ex.show(argc > 1 ? argv[1] : NULL);
+    ex.show(file);
 
     return Fl::run();
 }
