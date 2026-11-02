@@ -34,13 +34,13 @@
 #include "mkvextract.hpp"
 
 
-void MKVextract::create_cmd(int val)
+void MKVextract::create_cmd(int option)
 {
     bool has_tracks = false, has_attach = false;
     std::string base, attach_dir;
 
     auto add_option = [&, this] (const char *str) {
-        if (val == CREATE_VECTOR) {
+        if (option == CREATE_VECTOR) {
             m_args.emplace_back(str);
         } else {
             m_txtbuf->append(" ", 1);
@@ -49,7 +49,7 @@ void MKVextract::create_cmd(int val)
     };
 
     auto add_path = [&, this] (std::string str) {
-        if (val == CREATE_VECTOR) {
+        if (option == CREATE_VECTOR) {
             m_args.push_back(std::move(str));
         } else {
             std::string s = ' ' + utils::quote_filename(str);
@@ -60,7 +60,7 @@ void MKVextract::create_cmd(int val)
 
     m_args.clear();
 
-    if (val == CREATE_VECTOR) {
+    if (option == CREATE_VECTOR) {
         m_args = { "mkvextract", m_file, "--ui-language", "en_US", "--gui-mode" };
     } else {
         std::string s = "mkvextract " + utils::quote_filename(m_file);

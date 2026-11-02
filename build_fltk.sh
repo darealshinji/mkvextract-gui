@@ -9,7 +9,8 @@ if [ ! -e fltk ]; then
     VERSION=$(cat "fltk_version.dat")
     GIT_HASH=$(git rev-parse --short HEAD)
     echo "#pragma once" > ../version.h
-    echo "#define FLTK_VERSION \"${VERSION} (git snapshot ${GIT_HASH})\"" >> ../version.h
+    echo "#define FLTK_VERSION \"${VERSION}\"" >> ../version.h
+    echo "#define FLTK_GIT \"${GIT_HASH}\"" >> ../version.h
 
     cd ..
 fi

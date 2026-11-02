@@ -86,7 +86,7 @@ enum {
 
 /* count objects in array */
 template <typename T, size_t N>
-size_t count_of(T(&)[N]) {
+constexpr size_t count_of(T(&)[N]) {
     return std::extent<T[N]>::value;
 }
 
@@ -101,7 +101,12 @@ static struct codec_specs mkv_codec_list[] =
 /* display attachment file sizes in human readable values */
 static std::string human_readable_size(std::string &line)
 {
+    const long kb = 1024;
+    const long mb = 1024 * kb;
+    const long gb = 1024 * mb;
+    char unit;
     long size;
+    double d;
 
     try {
         size = std::stol(line);
@@ -109,31 +114,23 @@ static std::string human_readable_size(std::string &line)
         return line + " B";
     }
 
-    const long kb = 1024;
-    const long mb = 1024 * kb;
-    const long gb = 1024 * mb;
-
-    if (size >= kb) {
-        const char *unit;
-        char buf[64];
-        double d = size;
-
-        if (size < mb) {
-            d /= kb;
-            unit = " KiB";
-        } else if (size < gb) {
-            d /= mb;
-            unit = " MiB";
-        } else {
-            d /= gb;
-            unit = " GiB";
-        }
-
-        snprintf(buf, sizeof(buf), "%.1f", d);
-        return std::string(buf) + unit;
+    if (size < kb) {
+        return line + " B";
+    } else if (size < mb) {
+        d = size / kb;
+        unit = 'K';
+    } else if (size < gb) {
+        d = size / mb;
+        unit = 'M';
+    } else {
+        d = size / gb;
+        unit = 'G';
     }
 
-    return line + " B";
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%.1f %ciB", d, unit);
+
+    return buf;
 }
 
 
@@ -251,8 +248,8 @@ void MKVextract::run_mkvinfo(std::stop_token stoken)
     std::string error;
 
     Fl::lock();
-    m_win->dnd_enabled(false);
-    m_but_add->deactivate();
+    m_win_main->dnd_enabled(false);
+    m_but_open->deactivate();
     Fl::unlock();
     Fl::awake();
 
@@ -267,8 +264,8 @@ void MKVextract::run_mkvinfo(std::stop_token stoken)
 
         fl_message_title("Error");
         fl_message("%s", error.c_str());
-        m_but_add->activate();
-        m_win->dnd_enabled(true);
+        m_but_open->activate();
+        m_win_main->dnd_enabled(true);
 
         Fl::unlock();
         Fl::awake();
@@ -296,14 +293,14 @@ void MKVextract::run_mkvinfo(std::stop_token stoken)
         sel_attach->activate();
     }
 
-    m_infile_label->copy_label(m_file.c_str());
-    m_use_source_path->activate();
-    m_but_add->activate();
+    m_box_infile->copy_label(m_file.c_str());
+    m_chk_sourcepath->activate();
+    m_but_open->activate();
 
     do_update_browser();
     do_check_outdir();
 
-    m_win->dnd_enabled(true);
+    m_win_main->dnd_enabled(true);
 
     Fl::unlock();
     Fl::awake();

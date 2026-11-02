@@ -36,13 +36,13 @@ class rotate_box : public Fl_Box
 private:
 
     static constexpr double m_time = 0.1; /* seconds */
-
-    bool m_running = false;
     std::vector<Fl_SVG_Image *> m_array;
     std::vector<Fl_SVG_Image *>::iterator m_frame;
+    bool m_running;
 
     static void next_frame_cb(void *p);
     void do_next_frame();
+    void init();
 
 public:
 

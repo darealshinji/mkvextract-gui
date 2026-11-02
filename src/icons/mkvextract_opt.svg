@@ -1,0 +1,56 @@
+<svg width="1024" height="1024" version="1.1" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+ <defs>
+  <marker id="i" overflow="visible" markerHeight="0.6" markerWidth="0.6" orient="auto-start-reverse" preserveAspectRatio="xMidYMid" viewBox="0 0 1 1">
+   <path transform="scale(.7)" d="m-2-4 11 4-11 4c2-2.33 2-5.66 0-8z" fill="context-stroke" fill-rule="evenodd"/>
+  </marker>
+  <radialGradient id="f" cx="81.976" cy="164.7" r="15.137" gradientTransform="matrix(-.86973 -1.4189 1.5827 -.97012 -114.91 440.07)" gradientUnits="userSpaceOnUse">
+   <stop stop-color="#727ec5" offset=".41424"/>
+   <stop stop-color="#161d45" offset=".78701"/>
+  </radialGradient>
+  <radialGradient id="e" cx="92.126" cy="161.98" r="15.137" gradientTransform="matrix(.9525 -.75917 .78044 .96476 -137.9 83.528)" gradientUnits="userSpaceOnUse">
+   <stop stop-color="#fff" offset=".46298"/>
+   <stop stop-opacity=".24476" offset=".75164"/>
+  </radialGradient>
+  <radialGradient id="d" cx="96.762" cy="159.07" r="15.137" gradientTransform="matrix(.35947 -.43282 .80829 .61015 -94.022 119.75)" gradientUnits="userSpaceOnUse">
+   <stop stop-color="#bcbebc" offset=".32355"/>
+   <stop stop-color="#2a2a2a" offset=".70517"/>
+  </radialGradient>
+  <radialGradient id="c" cx="89.69" cy="159.61" r="15.137" gradientTransform="matrix(.6238 -.7122 .69671 .59995 -81.462 121.18)" gradientUnits="userSpaceOnUse">
+   <stop stop-color="#ff0" offset="0"/>
+   <stop stop-color="#32320a" offset="1"/>
+  </radialGradient>
+  <radialGradient id="b" cx="89.69" cy="159.61" r="15.137" gradientTransform="matrix(.27408 -.31292 .30612 .2636 27.601 127.83)" gradientUnits="userSpaceOnUse">
+   <stop stop-color="#d80000" offset="0"/>
+   <stop stop-color="#0a0a0a" offset="1"/>
+  </radialGradient>
+  <marker id="h" overflow="visible" markerHeight="0.60000002" markerWidth="0.60000002" orient="auto-start-reverse" preserveAspectRatio="xMidYMid" viewBox="0 0 1 1">
+   <path transform="scale(.7)" d="m-2-4 11 4-11 4c2-2.33 2-5.66 0-8z" fill="context-stroke" fill-rule="evenodd"/>
+  </marker>
+  <marker id="g" overflow="visible" markerHeight="0.60000002" markerWidth="0.60000002" orient="auto-start-reverse" preserveAspectRatio="xMidYMid" viewBox="0 0 1 1">
+   <path transform="scale(.7)" d="m-2-4 11 4-11 4c2-2.33 2-5.66 0-8z" fill="context-stroke" fill-rule="evenodd"/>
+  </marker>
+  <radialGradient id="a" cx="89.69" cy="159.61" r="15.137" gradientTransform="matrix(.27408 -.31292 .30612 .2636 21.369 174.62)" gradientUnits="userSpaceOnUse">
+   <stop stop-color="#d800ff" offset="0"/>
+   <stop stop-color="#0a0a0a" offset="1"/>
+  </radialGradient>
+ </defs>
+ <g transform="translate(-47.88 -138.17)">
+  <g transform="matrix(14.824 0 0 14.824 -569.47 -1807.6)" filter="url(#filter10)">
+   <rect x="43.365" y="133.46" width="65.77" height="65.214" rx="7.7782" ry="7.7782" fill="#c8c8c8" fill-opacity=".75" filter="url(#filter10)" style="paint-order:stroke markers fill"/>
+   <ellipse transform="matrix(.35706 .93408 -.93768 .34751 0 0)" cx="181.12" cy="-8.9108" rx="31.964" ry="17.06" fill="none" stroke="#000" stroke-opacity=".41038" stroke-width="3.238" style="mix-blend-mode:normal"/>
+   <ellipse transform="matrix(.96853 -.24889 .22991 .97321 0 0)" cx="34.342" cy="180.16" rx="30.404" ry="9.3498" fill="none" stroke="#000" stroke-opacity=".57076" stroke-width="2.4287"/>
+   <ellipse cx="77.257" cy="167.86" rx="15.137" ry="14.904" fill="url(#f)" stroke-width=".26458" style="mix-blend-mode:normal"/>
+   <ellipse cx="85.825" cy="152.94" rx="7.423" ry="7.446" fill="url(#c)" stroke-width=".13096" style="mix-blend-mode:normal"/>
+   <ellipse cx="74.009" cy="171.18" rx="9.8" ry="9.7172" fill="url(#e)" stroke-width=".1719" style="mix-blend-mode:normal"/>
+   <path transform="matrix(.96853 -.24889 .22991 .97321 0 0)" d="m50.583 188.07a30.404 9.3498 0 0 1-29.384 0.52698" fill="none" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-opacity=".57076" stroke-width="2.4287" style="paint-order:stroke markers fill"/>
+   <circle cx="72.079" cy="172.77" r="2.3241" fill="#3c3cff" stroke="#2828b4" stroke-linejoin="round" stroke-width="1.2142"/>
+   <ellipse cx="67.32" cy="178.24" rx="4.7912" ry="4.6467" fill="url(#d)" style="mix-blend-mode:normal"/>
+   <ellipse cx="101.1" cy="141.79" rx="3.2615" ry="3.2716" fill="url(#b)" filter="url(#filter10-0)" stroke-width=".05754" style="mix-blend-mode:normal"/>
+   <ellipse cx="94.871" cy="188.58" rx="3.2615" ry="3.2716" fill="url(#a)" filter="url(#filter10-0)" stroke-width=".05754" style="mix-blend-mode:normal"/>
+   <path d="m73.233 171.89h27.111" stroke-linejoin="round" stroke-width=".80948"/>
+   <path d="m74.595 172.81h23.974c1.9167 0 2.6983-0.97713 2.6983-3.1525v-17.778" fill="none" marker-end="url(#i)" stroke="#2828b4" stroke-linejoin="round" stroke-width="1.619"/>
+   <path d="m82.997 172.8c1.9167 0 2.6983-0.97713 2.6983-3.1525v-2.5329" fill="none" filter="url(#filter10)" marker-end="url(#h)" stroke="#2828b4" stroke-linejoin="round" stroke-width="1.619"/>
+   <path d="m92.125 172.81c1.9167 0 2.6983 0.97713 2.6983 3.1525v2.5329" fill="none" filter="url(#filter10)" marker-end="url(#g)" stroke="#2828b4" stroke-linejoin="round" stroke-width="1.619"/>
+  </g>
+ </g>
+</svg>

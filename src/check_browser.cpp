@@ -45,11 +45,9 @@ int check_browser::handle(int event)
 
 /* c'tor */
 check_browser::check_browser(Fl_Menu_Item *m, int X, int Y, int W, int H)
-: Fl_Check_Browser(X, Y, W, H)
+: Fl_Check_Browser(X, Y, W, H),
+  m_menu(m)
 {
-    m_menu = m;
-    box(FL_THIN_DOWN_BOX);
-    color(fl_lighter(FL_BACKGROUND_COLOR));
     when(FL_WHEN_CHANGED);
 }
 

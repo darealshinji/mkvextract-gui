@@ -63,10 +63,10 @@ void MKVextract::run_mkvextract(std::stop_token &stoken)
 
     Fl::lock();
 
-    m_win->dnd_enabled(false);
-    m_use_source_path->deactivate();
+    m_win_main->dnd_enabled(false);
+    m_chk_sourcepath->deactivate();
     m_but_outdir->deactivate();
-    m_but_add->deactivate();
+    m_but_open->deactivate();
 
     m_but_extract->deactivate();
     m_but_extract->hide();
@@ -74,7 +74,7 @@ void MKVextract::run_mkvextract(std::stop_token &stoken)
     m_but_abort->activate();
     m_but_abort->show();
 
-    m_rotate->start();
+    m_box_rotate->start();
 
     Fl::unlock();
     Fl::awake();
@@ -85,7 +85,7 @@ void MKVextract::run_mkvextract(std::stop_token &stoken)
 
     if (!cmd.open_pipe()) {
         Fl::lock();
-        m_progress_box->label("ERROR");
+        m_box_progress->label("ERROR");
         restore_main_window();
         Fl::unlock();
         Fl::awake();
@@ -104,7 +104,7 @@ void MKVextract::run_mkvextract(std::stop_token &stoken)
 
         if (line.starts_with(gui_progress)) {
             Fl::lock();
-            m_progress_box->copy_label(line.c_str() + gui_progress.size());
+            m_box_progress->copy_label(line.c_str() + gui_progress.size());
             Fl::unlock();
             Fl::awake();
         } else if (line.starts_with(gui_error)) {
@@ -113,7 +113,7 @@ void MKVextract::run_mkvextract(std::stop_token &stoken)
 
             Fl::lock();
 
-            m_progress_box->label("ERROR");
+            m_box_progress->label("ERROR");
             restore_main_window();
             fl_message_title("Error");
             fl_message("%s", line.c_str());
@@ -126,7 +126,7 @@ void MKVextract::run_mkvextract(std::stop_token &stoken)
     }
 
     Fl::lock();
-    m_progress_box->label("DONE");
+    m_box_progress->label("DONE");
     restore_main_window();
     Fl::unlock();
     Fl::awake();

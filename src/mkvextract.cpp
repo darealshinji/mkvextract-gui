@@ -34,8 +34,9 @@
 #include <FL/Fl_Double_Window.H>
 #include <FL/Fl_Group.H>
 #include <FL/Fl_Menu_Item.H>
+#include <FL/Fl_Preferences.H>
 #include <FL/Fl_Text_Buffer.H>
-#include <FL/Fl_Text_Display.H>
+#include <FL/Fl_SVG_Image.H>
 #include <FL/filename.H>
 #include <FL/fl_ask.H>
 
@@ -53,57 +54,28 @@
 #include "rotate_box.hpp"
 #include "mkvextract.hpp"
 
+#define VENDOR        "djcj"
+#define APPNAME       "simple-mkvextract-gui"
+#define DEFAULT_TITLE "simple mkvextract GUI"
 
-
-/* generate callback function (lambda) */
-#define MAKE_CALLBACK(NAME) \
-    static auto NAME##_cb = [] (Fl_Widget *, void *p) { \
-        reinterpret_cast<decltype(this)>(p)->do_##NAME(); \
-    }
-
-/* generate callback function and set callback */
-#define METHODCB(WIDGET, NAME) \
-    do { \
-        MAKE_CALLBACK(NAME); \
-        WIDGET->callback(NAME##_cb, this); \
-    } while (0)
-
-
-enum {
-    /* buttons */
-    BUT_H          = 28,
-    BUT_W          = 110,
-
-    /* main window */
-    DEFAULT_W      = 800,
-    DEFAULT_H      = 480,
-    MINIMUM_W      = 400,
-    MINIMUM_H      = 200,
-
-    /* command line window */
-    CMD_W          = 640,
-    CMD_H          = 320,
-    CMD_MIN_W      = 160,
-    CMD_MIN_H      = 100,
-
-    /* Fl::copy() options */
-    COPY_SELECTION = 0,
-    COPY_CLIPBOARD = 1,
-    COPY_BOTH      = 2
-};
-
-
-static const char *default_title = "simple mkvextract GUI";
 
 
 /* multithreading */
 
-void MKVextract::start_info_thread(const char *file)
+static bool semaphore_in_use(std::binary_semaphore &sem)
 {
-    if (!file || !*file) {
-        return;
+    /* try_acquire() fails without blocking if semaphore
+     * is still in use by the extraction thread */
+    if (sem.try_acquire()) {
+        sem.release();
+        return false;
     }
 
+    return true;
+}
+
+void MKVextract::start_info_thread(const char *file)
+{
     stop_and_delete_threads();
 
     m_file = fs::absolute(file);
@@ -141,25 +113,12 @@ void MKVextract::stop_and_delete_threads()
 }
 
 
-/* try_acquire() fails without blocking if semaphore is
- * still in use by the extraction thread */
-bool MKVextract::extraction_in_progress()
-{
-    if (m_extract_semaphore.try_acquire()) {
-        m_extract_semaphore.release();
-        return false;
-    }
-
-    return true;
-}
-
-
 void MKVextract::restore_main_window()
 {
-    m_rotate->stop();
+    m_box_rotate->stop();
 
     m_but_outdir->activate();
-    m_but_add->activate();
+    m_but_open->activate();
 
     m_but_abort->deactivate();
     m_but_abort->hide();
@@ -167,11 +126,11 @@ void MKVextract::restore_main_window()
     m_but_extract->activate();
     m_but_extract->show();
 
-    m_use_source_path->activate();
+    m_chk_sourcepath->activate();
     do_check_outdir();
 
-    m_win->dnd_enabled(true);
-    m_win->redraw();
+    m_win_main->dnd_enabled(true);
+    m_win_main->redraw();
 }
 
 
@@ -198,7 +157,9 @@ void MKVextract::do_dnd()
         fl_decode_uri(std::data(item));
     }
 
-    start_info_thread(item.c_str());
+    if (!item.empty()) {
+        start_info_thread(item.c_str());
+    }
 }
 
 
@@ -214,9 +175,9 @@ void MKVextract::do_set_outdir()
     }
 
     m_outdir_manual = dir;
-    m_outdir_field->copy_label(m_outdir_manual.c_str());
-    m_outdir_field->activate();
-    m_use_source_path->clear();
+    m_box_outdir->copy_label(m_outdir_manual.c_str());
+    m_box_outdir->activate();
+    m_chk_sourcepath->clear();
 }
 
 
@@ -225,17 +186,11 @@ void MKVextract::do_open_file()
     FNFC fc(FNFC::BROWSE_FILE, "Select a file");
     fc.filter("Matroska\t*.mkv,*.mka,*.mks,*.mk3d,*.webm");
 
-    start_info_thread(fc.select());
-}
+    const char *file = fc.select();
 
-
-void MKVextract::do_copy_command()
-{
-    /* get a local copy first */
-    std::string str = m_txtbuf->text_str();
-
-    /* copy text to clipboard */
-    Fl::copy(str.c_str(), str.length(), COPY_CLIPBOARD);
+    if (file && *file) {
+        start_info_thread(file);
+    }
 }
 
 
@@ -243,21 +198,42 @@ void MKVextract::do_cmd()
 {
     create_cmd(CREATE_TEXTBUFFER);
 
-    if (!m_cmd->shown()) {
-        /* resize window to default and
-         * position at center above main window */
-        int x = m_win->x() + ((m_win->w() - CMD_W) / 2);
-        int y = m_win->y() + ((m_win->h() - CMD_H) / 2);
-        m_cmd->resize(x, y, CMD_W, CMD_H);
+    /* resize window if it was reopened */
+    if (!m_win_cmd->shown()) {
+        int x, y;
+
+        if (m_chk_center->value() == 0) {
+            x = m_win_cmd->x();
+            y = m_win_cmd->y();
+        } else {
+            x = m_win_main->x() + ((m_win_main->w() - CMD_W) / 2);
+            y = m_win_main->y() + ((m_win_main->h() - CMD_H) / 2);
+        }
+
+        m_win_cmd->resize(x, y, CMD_W, CMD_H);
     }
 
-    m_cmd->show();
+    m_win_cmd->show();
+}
+
+
+void MKVextract::do_settings()
+{
+    if (!m_win_set->shown() && m_chk_center->value() != 0) {
+        /* position at center above main window */
+        int x = m_win_main->x() + ((m_win_main->w() - m_win_set->w()) / 2);
+        int y = m_win_main->y() + ((m_win_main->h() - m_win_set->h()) / 2);
+        m_win_set->position(x, y);
+    }
+
+    m_win_set->show();
 }
 
 
 void MKVextract::do_extract()
 {
-    m_cmd->hide();
+    m_win_cmd->hide();
+    m_win_set->hide();
     start_extract_thread();
 }
 
@@ -265,21 +241,21 @@ void MKVextract::do_extract()
 void MKVextract::do_abort()
 {
     stop_and_delete_threads();
-    m_progress_box->label("STOPPED");
+    m_box_progress->label("STOPPED");
     restore_main_window();
 }
 
 
 void MKVextract::do_check_outdir()
 {
-    if (m_use_source_path->value() == true) {
-        /* same as input file directory */
-        m_outdir_field->copy_label(m_outdir_source.c_str());
-        m_outdir_field->deactivate();
-    } else {
+    if (m_chk_sourcepath->value() == 0) {
         /* manually selected output directory */
-        m_outdir_field->copy_label(m_outdir_manual.c_str());
-        m_outdir_field->activate();
+        m_box_outdir->copy_label(m_outdir_manual.c_str());
+        m_box_outdir->activate();
+    } else {
+        /* same as input file directory */
+        m_box_outdir->copy_label(m_outdir_source.c_str());
+        m_box_outdir->deactivate();
     }
 }
 
@@ -299,7 +275,7 @@ void MKVextract::do_update_browser()
     if (m_browser->nchecked() == 0) {
         m_but_extract->deactivate();
         m_but_cmd->deactivate();
-        m_progress_box->label(NULL);
+        m_box_progress->label(NULL);
 
         sel_none->deactivate();
         sel_all->activate();
@@ -307,10 +283,9 @@ void MKVextract::do_update_browser()
     }
 
     /* one or more items selected */
-
     m_but_extract->activate();
     m_but_cmd->activate();
-    m_progress_box->label("READY");
+    m_box_progress->label("READY");
 
     sel_none->activate();
 
@@ -330,7 +305,7 @@ void MKVextract::do_update_browser()
     }
 
     /* update command window */
-    if (m_cmd->shown()) {
+    if (m_win_cmd->shown()) {
         create_cmd(CREATE_TEXTBUFFER);
     }
 }
@@ -370,10 +345,10 @@ void MKVextract::do_quit()
     }
 
     /* warn if extraction is still in progress */
-    if (extraction_in_progress()) {
+    if (semaphore_in_use(m_extract_semaphore)) {
         const char *msg = "Extraction is still in progress.\nClose the program anyway?";
 
-        fl_message_title(default_title);
+        fl_message_title(DEFAULT_TITLE);
 
         if (fl_choice("%s", "Cancel", "Close", "Don't close", msg) != 1) {
             return;
@@ -395,6 +370,8 @@ void MKVextract::init_main_window()
     MAKE_CALLBACK(select_attach);
     MAKE_CALLBACK(dnd);
 
+    static Fl_SVG_Image svg(NULL, svg::settings, svg::settings_len);
+
     static Fl_Menu_Item menu[] = {
         {"Select all",         0, select_all_cb,    this, FL_MENU_INACTIVE},
         {"Select none",        0, select_none_cb,   this, FL_MENU_INACTIVE},
@@ -405,48 +382,58 @@ void MKVextract::init_main_window()
     /* main window */
     w = DEFAULT_W;
     h = DEFAULT_H;
-    m_win = new dnd_window(w, h, default_title);
-    METHODCB(m_win, quit);
-    m_win->dnd(dnd_cb, this);
-    m_win->dnd_enabled(true);
+    m_win_main = new dnd_window(w, h, DEFAULT_TITLE);
+    m_win_main->dnd(dnd_cb, this);
+    m_win_main->dnd_enabled(true);
+    METHODCB(m_win_main, quit);
 
         /* upper area group */
         x = 0;
         y = 0;
-        w = m_win->w();
+        w = m_win_main->w();
         h = BUT_H + 10;
         auto g_up = new Fl_Group(x, y, w, h);
 
+            /* "Settings" button */
+            x = m_win_main->w() - 10 - BUT_H;
+            y = 5;
+            w = BUT_H;
+            h = BUT_H;
+            auto but_set = new Fl_Button(x, y, w, h);
+            svg.scale(w-4, h-4, 0, 1);
+            but_set->image(svg);
+            but_set->tooltip("Settings");
+            METHODCB(but_set, settings);
+
             /* "Open file" button */
-            x = m_win->w() - 10 - BUT_W;
+            x = but_set->x() - 10 - BUT_W;
             y = 5;
             w = BUT_W;
             h = BUT_H;
-            m_but_add = new Fl_Button(x, y, w, h, "Open file");
-            METHODCB(m_but_add, open_file);
+            m_but_open = new Fl_Button(x, y, w, h, "Open file");
+            METHODCB(m_but_open, open_file);
 
             /* input file label */
             x = 10;
             y = 5;
-            w = m_but_add->x() - 20;
+            w = m_but_open->x() - 20;
             h = BUT_H;
-            m_infile_label = new Fl_Box(FL_THIN_DOWN_BOX, x, y, w, h, NULL);
-            m_infile_label->labelsize(12);
-            m_infile_label->align(left_align);
+            m_box_infile = new Fl_Box(FL_THIN_DOWN_BOX, x, y, w, h, NULL);
+            m_box_infile->align(left_align);
 
         g_up->end();
-        g_up->resizable(m_infile_label);
+        g_up->resizable(m_box_infile);
 
         /* bottom area group */
         x = 0;
-        y = m_win->h() - BUT_H*2 - 25;
-        w = m_win->w();
+        y = m_win_main->h() - BUT_H*2 - 25;
+        w = m_win_main->w();
         h = BUT_H*2 + 25;
         auto g_bttm = new Fl_Group(x, y, w, h);
 
             /* "Extract" button */
-            x = m_win->w() - 10 - BUT_W;
-            y = m_win->h() - 10 - BUT_H;
+            x = m_win_main->w() - 10 - BUT_W;
+            y = m_win_main->h() - 10 - BUT_H;
             w = BUT_W;
             h = BUT_H;
             m_but_extract = new Fl_Button(x, y, w, h, "Extract");
@@ -475,7 +462,7 @@ void MKVextract::init_main_window()
             /* progress area group */
             x = 0;
             y = m_but_extract->y();
-            w = m_win->w() - 30 - 2*BUT_W;
+            w = m_win_main->w() - 30 - 2*BUT_W;
             h = BUT_H;
             auto g_prog = new Fl_Group(x, y, w, h);
 
@@ -484,15 +471,15 @@ void MKVextract::init_main_window()
                 y = g_prog->y();
                 w = BUT_W;
                 h = BUT_H;
-                m_progress_box = new Fl_Box(FL_THIN_DOWN_BOX, x, y, w, h, NULL);
-                m_progress_box->align(center_align);
+                m_box_progress = new Fl_Box(FL_THIN_DOWN_BOX, x, y, w, h, NULL);
+                m_box_progress->align(center_align);
 
                 /* icon box */
                 x = BUT_W + 15;
                 y = g_prog->y();
                 w = BUT_H;
                 h = BUT_H;
-                m_rotate = new rotate_box(x, y, w, h);
+                m_box_rotate = new rotate_box(x, y, w, h);
 
                 /* dummy */
                 x = m_but_cmd->x() - 1;
@@ -509,93 +496,43 @@ void MKVextract::init_main_window()
             y = m_but_extract->y() - BUT_H - 5;
             w = g_prog->w() - 10;
             h = BUT_H;
-            m_outdir_field = new Fl_Box(FL_THIN_DOWN_BOX, x, y, w, h, NULL);
-            m_outdir_field->copy_label(m_outdir_manual.c_str());
-            m_outdir_field->align(left_align);
+            m_box_outdir = new Fl_Box(FL_THIN_DOWN_BOX, x, y, w, h, NULL);
+            m_box_outdir->copy_label(m_outdir_manual.c_str());
+            m_box_outdir->align(left_align);
 
             /* "Source path" check button */
             x = m_but_extract->x();
             y = m_but_extract->y() - BUT_H - 5;
             w = BUT_W;
             h = BUT_H;
-            m_use_source_path = new Fl_Check_Button(x, y, w, h, " Source path");
-            m_use_source_path->deactivate();
-            METHODCB(m_use_source_path, check_outdir);
+            m_chk_sourcepath = new Fl_Check_Button(x, y, w, h, " Source path");
+            m_chk_sourcepath->deactivate();
+            METHODCB(m_chk_sourcepath, check_outdir);
 
             /* "Destination" button */
             x = m_but_cmd->x();
-            y = m_use_source_path->y();
+            y = m_chk_sourcepath->y();
             w = BUT_W;
             h = BUT_H;
             m_but_outdir = new Fl_Button(x, y, w, h, "Destination");
             METHODCB(m_but_outdir, set_outdir);
 
         g_bttm->end();
-        g_bttm->resizable(m_outdir_field);
+        g_bttm->resizable(m_box_outdir);
 
         /* check browser between the two main groups */
         x = 10;
         y = g_up->y() + g_up->h();
-        w = m_win->w() - 20;
-        h = m_win->h() - g_up->h() - g_bttm->h();
+        w = m_win_main->w() - 20;
+        h = m_win_main->h() - g_up->h() - g_bttm->h();
         m_browser = new check_browser(menu, x, y, w, h);
+        m_browser->box(FL_THIN_DOWN_BOX);
+        m_browser->color(fl_lighter(FL_BACKGROUND_COLOR));
         METHODCB(m_browser, update_browser);
 
-    m_win->end();
-    m_win->resizable(m_browser);
-    m_win->size_range(MINIMUM_W, MINIMUM_H, Fl::w(), Fl::h());
-}
-
-
-void MKVextract::init_cmd_window()
-{
-    int x, y, w, h;
-
-    /* text buffer */
-    m_txtbuf = new Fl_Text_Buffer();
-
-    /* command line window */
-    w = CMD_W;
-    h = CMD_H;
-    m_cmd = new Fl_Double_Window(w, h, "Command line");
-
-        /* text display */
-        x = 10;
-        y = 10;
-        w = m_cmd->w() - 20;
-        h = m_cmd->h() - 20 - BUT_H;
-        auto txt = new Fl_Text_Display(x, y, w, h);
-        txt->wrap_mode(Fl_Text_Display::WRAP_AT_BOUNDS, 2);
-        txt->buffer(m_txtbuf);
-
-        /* button group */
-        x = 0;
-        y = txt->y() + txt->h();
-        w = m_cmd->w();
-        h = m_cmd->h() - y;
-        auto g_bttn = new Fl_Group(x, y, w, h);
-
-            /* "Copy" button */
-            x = g_bttn->w() - 10 - BUT_W;
-            y = g_bttn->y() + 5;
-            w = BUT_W;
-            h = BUT_H;
-            auto btcopy = new Fl_Button(x, y, w, h, "Copy");
-            METHODCB(btcopy, copy_command);
-
-            /* dummy */
-            x = btcopy->x() - 1;
-            y = btcopy->y();
-            w = 1;
-            h = 1;
-            auto dummy = new Fl_Box(FL_NO_BOX, x, y, w, h, NULL);
-
-        g_bttn->end();
-        g_bttn->resizable(dummy);
-
-    m_cmd->end();
-    m_cmd->resizable(txt);
-    m_cmd->size_range(CMD_MIN_W, CMD_MIN_H, Fl::w(), Fl::h());
+    m_win_main->end();
+    m_win_main->resizable(m_browser);
+    m_win_main->size_range(MINIMUM_W, MINIMUM_H, Fl::w(), Fl::h());
 }
 
 
@@ -605,11 +542,29 @@ MKVextract::MKVextract()
   m_th_extract(NULL),
   m_th_info(NULL)
 {
+    std::string pref_scheme;
+    int pref_theme, pref_center;
+
+    /* get settings */
+    Fl_Preferences pref(Fl_Preferences::USER_L, VENDOR, APPNAME);
+    pref.get("scheme", pref_scheme, "base");
+    pref.get("theme", pref_theme, THEME_LIGHT);
+    pref.get("center", pref_center, 0);
+
+    /* set before initializing windows */
+    Fl::scheme(pref_scheme.c_str());
     m_outdir_manual = fs::current_path();
 
     /* init windows */
+    //Fl::visible_focus(0);
     init_main_window();
     init_cmd_window();
+    init_settings_window();
+
+    /* set after initializing windows */
+    m_chk_center->value(pref_center);
+    m_choice_colors->value(pref_theme);
+    do_colors();
 }
 
 
@@ -618,28 +573,38 @@ MKVextract::~MKVextract()
 {
     stop_and_delete_threads();
 
-    delete m_cmd;
-    delete m_win;
+    /* save settings */
+    Fl_Preferences pref(Fl_Preferences::USER_L, VENDOR, APPNAME);
+    const char *p = Fl::scheme();
+    pref.set("scheme", p ? p : "base");
+    pref.set("theme", m_choice_colors->value());
+    pref.set("center", m_chk_center->value());
+
+    delete m_win_set;
+    delete m_win_cmd;
+    delete m_win_main;
     delete m_txtbuf;
 }
 
 
 void MKVextract::show(const char *file)
 {
-    if (m_win->shown()) {
+    if (m_win_main->shown()) {
         return;
     }
 
-    m_win->show();
+    if (m_chk_center->value() != 0) {
+        int x = (Fl::w() - m_win_main->decorated_w()) / 2;
+        int y = (Fl::h() - m_win_main->decorated_h()) / 2;
+        m_win_main->position(x, y);
+    }
 
-    /* position at desktop center */
-    //m_win->wait_for_expose();
-    int x = (Fl::w() - m_win->decorated_w()) / 2;
-    int y = (Fl::h() - m_win->decorated_h()) / 2;
-    m_win->position(x, y);
+    m_win_main->show();
 
     Fl::lock();
 
-    start_info_thread(file);
+    if (file && *file) {
+        start_info_thread(file);
+    }
 }
 

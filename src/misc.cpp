@@ -39,7 +39,7 @@ std::string MKVextract::stem_path()
 {
     fs::path path;
 
-    if (m_use_source_path->value() == true) {
+    if (m_chk_sourcepath->value() != 0) {
         path = m_outdir_source;
     } else {
         path = m_outdir_manual;

@@ -38,6 +38,7 @@ namespace fs = std::filesystem;
 class Fl_Box;
 class Fl_Button;
 class Fl_Check_Button;
+class Fl_Choice;
 class Fl_Double_Window;
 struct Fl_Menu_Item;
 class Fl_Native_File_Chooser;
@@ -48,9 +49,54 @@ class dnd_window;
 class rotate_box;
 
 
+/* generate callback function (lambda) */
+#define MAKE_CALLBACK(NAME) \
+    static auto NAME##_cb = [] (Fl_Widget *, void *p) { \
+        reinterpret_cast<decltype(this)>(p)->do_##NAME(); \
+    }
+
+/* generate callback function and set callback */
+#define METHODCB(WIDGET, NAME) \
+    do { \
+        MAKE_CALLBACK(NAME); \
+        WIDGET->callback(NAME##_cb, this); \
+    } while (0)
+
+
 class MKVextract
 {
 private:
+
+    enum {
+        /* buttons */
+        BUT_H          = 28,
+        BUT_W          = 110,
+
+        /* main window */
+        DEFAULT_W      = 800,
+        DEFAULT_H      = 480,
+        MINIMUM_W      = 400,
+        MINIMUM_H      = 200,
+
+        /* command line window */
+        CMD_W          = 640,
+        CMD_H          = 320,
+        CMD_MIN_W      = 160,
+        CMD_MIN_H      = 100,
+
+        /* create_cmd() options */
+        CREATE_VECTOR,
+        CREATE_TEXTBUFFER,
+
+        /* color themes */
+        THEME_LIGHT    = 0,
+        THEME_DARK     = 1,
+
+        /* Fl::copy() options */
+        COPY_SELECTION = 0,
+        COPY_CLIPBOARD = 1,
+        COPY_BOTH      = 2
+    };
 
     /* entry order in browser is tracks-->attachments-->timestamps-->chapters-->tags */
     size_t m_track_count = 0;
@@ -79,27 +125,31 @@ private:
     void stop_and_delete_threads();
 
     /* these objects must be deleted in the d'tor */
-    dnd_window *m_win;
-    Fl_Double_Window *m_cmd;
+    dnd_window *m_win_main;
+    Fl_Double_Window *m_win_cmd;
+    Fl_Double_Window *m_win_set;
     Fl_Text_Buffer *m_txtbuf;
 
     /* other widgets */
     check_browser *m_browser;
-    rotate_box *m_rotate;
     Fl_Button *m_but_outdir;
-    Fl_Button *m_but_add;
+    Fl_Button *m_but_open;
     Fl_Button *m_but_extract;
     Fl_Button *m_but_abort;
     Fl_Button *m_but_cmd;
-    Fl_Check_Button *m_use_source_path;
-    Fl_Box *m_progress_box;
-    Fl_Box *m_outdir_field;
-    Fl_Box *m_infile_label;
+    Fl_Check_Button *m_chk_sourcepath;
+    Fl_Check_Button *m_chk_center;
+    Fl_Choice *m_choice_colors;
+    rotate_box *m_box_rotate;
+    Fl_Box *m_box_progress;
+    Fl_Box *m_box_outdir;
+    Fl_Box *m_box_infile;
 
     /* actions used by callbacks */
     void do_abort();
     void do_check_outdir();
     void do_cmd();
+    void do_colors();
     void do_copy_command();
     void do_dnd();
     void do_extract();
@@ -109,12 +159,9 @@ private:
     void do_select_none();
     void do_select_attach();
     void do_set_outdir();
+    void do_settings();
     void do_update_browser();
 
-    enum {
-        CREATE_VECTOR,
-        CREATE_TEXTBUFFER
-    };
     void create_cmd(int val);
 
     std::string stem_path();
@@ -122,6 +169,7 @@ private:
     void restore_main_window();
     void init_main_window();
     void init_cmd_window();
+    void init_settings_window();
 
 
 public:
@@ -139,5 +187,17 @@ namespace utils
     void fold_text(std::string &text);
     bool command_in_path(const char *command);
     bool xml2ogm(const std::string &input, const std::string &output);
+}
+
+
+namespace svg
+{
+    /* application icon */
+    extern const unsigned char *mkvextract_opt;
+    extern size_t mkvextract_opt_len;
+
+    /* gear icon */
+    extern const unsigned char *settings;
+    extern size_t settings_len;
 }
 

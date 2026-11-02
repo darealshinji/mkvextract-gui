@@ -63,6 +63,10 @@ void rotate_box::next_frame_cb(void *p) {
 /* iterate through frames */
 void rotate_box::do_next_frame()
 {
+    if (!m_running) {
+        return;
+    }
+
     if (++m_frame == m_array.end()) {
         m_frame = m_array.begin();
     }
@@ -74,10 +78,10 @@ void rotate_box::do_next_frame()
 }
 
 
-rotate_box::rotate_box(int X, int Y, int W, int H)
-: Fl_Box(FL_NO_BOX, X, Y, W, H, NULL)
+/* initialize icon array */
+void rotate_box::init()
 {
-    std::string copy;
+    std::string data;
 
     /* number of images to generate */
     const int size = 8;
@@ -92,20 +96,29 @@ rotate_box::rotate_box(int X, int Y, int W, int H)
      * makes the color values shift/rotate to the right */
     for (int i = 0; i < size; ++i, --p) {
         size_t pos = 0;
-        copy = svg_template;
+        data = svg_template;
 
         /* insert color values */
         for (int j = 0; j < size; ++j) {
-            if (find_at_pos(copy, "@@@", pos)) {
-                copy.replace(pos, 3, 3, p[j]);
+            if (find_at_pos(data, "@@@", pos)) {
+                data.replace(pos, 3, 3, p[j]);
                 //putchar(p[j]);
             }
         }
 
-        m_array.push_back(new Fl_SVG_Image(NULL, copy.c_str()));
-        m_array.back()->resize(W, H);
+        auto svg = new Fl_SVG_Image(NULL, data.c_str());
+        svg->resize(w(), h());
+        m_array.push_back(svg);
         //putchar('\n');
     }
+}
+
+
+rotate_box::rotate_box(int X, int Y, int W, int H)
+: Fl_Box(FL_NO_BOX, X, Y, W, H, NULL),
+  m_running(false)
+{
+    init();
 }
 
 
@@ -122,15 +135,13 @@ rotate_box::~rotate_box()
 
 void rotate_box::start()
 {
-    if (m_running) {
-        return;
+    if (!m_running) {
+        m_frame = m_array.begin();
+        image(*m_frame);
+
+        Fl::add_timeout(m_time, next_frame_cb, this);
+        m_running = true;
     }
-
-    m_frame = m_array.begin();
-    image(*m_frame);
-
-    Fl::add_timeout(m_time, next_frame_cb, this);
-    m_running = true;
 }
 
 
@@ -138,9 +149,9 @@ void rotate_box::stop()
 {
     if (m_running) {
         Fl::remove_timeout(next_frame_cb);
+        m_running = false;
     }
 
     image(NULL);
-    m_running = false;
 }
 
