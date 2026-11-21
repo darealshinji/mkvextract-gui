@@ -543,13 +543,14 @@ MKVextract::MKVextract()
   m_th_info(NULL)
 {
     std::string pref_scheme;
-    int pref_theme, pref_center;
+    int pref_theme, pref_center, pref_saveids;
 
     /* get settings */
     Fl_Preferences pref(Fl_Preferences::USER_L, VENDOR, APPNAME);
     pref.get("scheme", pref_scheme, "base");
     pref.get("theme", pref_theme, THEME_LIGHT);
     pref.get("center", pref_center, 0);
+    pref.get("saveids", pref_saveids, 0);
 
     /* set before initializing windows */
     Fl::scheme(pref_scheme.c_str());
@@ -562,8 +563,9 @@ MKVextract::MKVextract()
     init_settings_window();
 
     /* set after initializing windows */
-    m_chk_center->value(pref_center);
     m_choice_colors->value(pref_theme);
+    m_chk_center->value(pref_center);
+    m_chk_saveids->value(pref_saveids);
     do_colors();
 }
 
@@ -576,9 +578,10 @@ MKVextract::~MKVextract()
     /* save settings */
     Fl_Preferences pref(Fl_Preferences::USER_L, VENDOR, APPNAME);
     const char *p = Fl::scheme();
-    pref.set("scheme", p ? p : "base");
+    pref.set("scheme", (p && *p) ? p : "base");
     pref.set("theme", m_choice_colors->value());
     pref.set("center", m_chk_center->value());
+    pref.set("saveids", m_chk_saveids->value());
 
     delete m_win_set;
     delete m_win_cmd;

@@ -438,7 +438,13 @@ int MKVextract::parse_mkvinfo(std::stop_token &stoken, std::string &error)
     for (size_t i = 0; i < tracks.size(); i++) {
         std::stringstream e; /* browser entry */
         std::stringstream filename;
-        char c = tracks.at(i).codec[0];
+        const char *ext = "";
+        std::string id_out;
+        char c = tracks.at(i).codec.front();
+
+        for (const auto &ch : tracks.at(i).codec) {
+            id_out.push_back(ch == '/' ? '-' : ch);
+        }
 
         /* generic track infos */
         e << "Track " << i+1 << ": " << type_string(c) << " [" << tracks.at(i).codec << "]";
@@ -458,10 +464,10 @@ int MKVextract::parse_mkvinfo(std::stop_token &stoken, std::string &error)
 
         filename << "track " << i+1 << " " << type_string(c);
 
-        /* append the correct file extension depending on the codec ID */
+        /* add the correct file extension depending on the codec ID */
         for (const auto &codec : mkv_codec_list) {
             if (tracks.at(i).codec == codec.id) {
-                filename << '.' << codec.ext;
+                ext = codec.ext;
                 break;
             }
         }
@@ -470,7 +476,8 @@ int MKVextract::parse_mkvinfo(std::stop_token &stoken, std::string &error)
         m_browser->add(e.str().c_str());
         Fl::unlock();
 
-        m_outnames.push_back(filename.str());
+        struct names fname = { filename.str(), ext, id_out };
+        m_outnames.push_back(fname);
     }
 
     /* attachments */
@@ -483,7 +490,8 @@ int MKVextract::parse_mkvinfo(std::stop_token &stoken, std::string &error)
         m_browser->add(e.str().c_str());
         Fl::unlock();
 
-        m_outnames.push_back(attach.at(i).name);
+        struct names fname = { attach.at(i).name, "", "" };
+        m_outnames.push_back(fname);
     }
 
     m_track_count = tracks.size();

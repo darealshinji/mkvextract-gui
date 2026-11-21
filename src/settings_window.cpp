@@ -52,8 +52,7 @@ static std::string get_version_string()
 #ifdef FLTK_VERSION
     s += FLTK_VERSION;
 # ifdef FLTK_GIT
-    s += "\n(git snapshot ";
-    s += FLTK_GIT;
+    s += "\n(git snapshot " FLTK_GIT ")";
 # endif
 #else
     int version = Fl::api_version();
@@ -99,6 +98,15 @@ void MKVextract::do_colors()
 }
 
 
+void MKVextract::do_saveids()
+{
+    /* update command window */
+    if (m_win_cmd->shown()) {
+        create_cmd(CREATE_TEXTBUFFER);
+    }
+}
+
+
 void MKVextract::init_settings_window()
 {
     std::stringstream strm;
@@ -129,11 +137,19 @@ void MKVextract::init_settings_window()
         METHODCB(m_choice_colors, colors);
 
         /* "center" check button */
-        x = m_choice_colors->x();
+        x = 10;
         y = m_choice_colors->y() + m_choice_colors->h() + 10;
-        w = settings_but_w;
+        w = m_win_set->w() - 20;
         h = BUT_H;
-        m_chk_center = new Fl_Check_Button(x, y, w, h, "Try to center windows");
+        m_chk_center = new Fl_Check_Button(x, y, w, h, " Try to center windows");
+
+        /* "save IDs" check button */
+        x = 10;
+        y = m_chk_center->y() + m_chk_center->h() + 10;
+        w = m_chk_center->w();
+        h = BUT_H;
+        m_chk_saveids = new Fl_Check_Button(x, y, w, h, " Save codec IDs instead of file extensions");
+        METHODCB(m_chk_saveids, saveids);
 
         /* version string */
         h = 60;

@@ -98,6 +98,12 @@ private:
         COPY_BOTH      = 2
     };
 
+    struct names {
+        std::string name;
+        const char *ext;
+        std::string id;
+    };
+
     /* entry order in browser is tracks-->attachments-->timestamps-->chapters-->tags */
     size_t m_track_count = 0;
     size_t m_attach_count = 0;
@@ -105,7 +111,7 @@ private:
     size_t m_chapters_entry = 0;
     size_t m_tags_entry = 0;
     std::vector<int> m_timestampIDs;
-    std::vector<std::string> m_outnames;
+    std::vector<struct names> m_outnames;
 
     fs::path m_file, m_outdir_source, m_outdir_manual;
     std::vector<std::string> m_args;
@@ -139,6 +145,7 @@ private:
     Fl_Button *m_but_cmd;
     Fl_Check_Button *m_chk_sourcepath;
     Fl_Check_Button *m_chk_center;
+    Fl_Check_Button *m_chk_saveids;
     Fl_Choice *m_choice_colors;
     rotate_box *m_box_rotate;
     Fl_Box *m_box_progress;
@@ -155,6 +162,7 @@ private:
     void do_extract();
     void do_open_file();
     void do_quit();
+    void do_saveids();
     void do_select_all();
     void do_select_none();
     void do_select_attach();

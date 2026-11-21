@@ -24,6 +24,7 @@
 
 #include <stddef.h>
 #include <FL/Fl.H>
+#include <FL/Fl_Check_Button.H>
 #include <FL/Fl_Text_Buffer.H>
 #include <filesystem>
 #include <sstream>
@@ -81,7 +82,14 @@ void MKVextract::create_cmd(int option)
         }
 
         std::stringstream strm;
-        strm << i << ':' << base << " - " << m_outnames.at(i);
+        strm << i << ':' << base << " - " << m_outnames.at(i).name;
+
+        if (m_chk_saveids->value() == 0) {
+            strm << '.' << m_outnames.at(i).ext;
+        } else {
+            strm << " [" << m_outnames.at(i).id << ']';
+        }
+
         add_path(strm.str());
     }
 
@@ -100,7 +108,7 @@ void MKVextract::create_cmd(int option)
             }
 
             std::stringstream strm;
-            strm << i+1 << ':' << attach_dir << m_outnames.at(m_track_count + i);
+            strm << i+1 << ':' << attach_dir << m_outnames.at(m_track_count + i).name;
             add_path(strm.str());
         }
     }
