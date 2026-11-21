@@ -68,18 +68,11 @@ void utils::fold_text(std::string &text)
 }
 
 
-static bool is_executable(fs::file_status &st)
+static bool is_executable(fs::perms p)
 {
-    auto p = st.permissions();
-
-    if ((p & fs::perms::owner_exec) == fs::perms::none &&
-        (p & fs::perms::group_exec) == fs::perms::none &&
-        (p & fs::perms::others_exec) == fs::perms::none)
-    {
-        return false;
-    }
-
-    return true;
+    return ((p & fs::perms::owner_exec) != fs::perms::none ||
+            (p & fs::perms::group_exec) != fs::perms::none ||
+            (p & fs::perms::others_exec) != fs::perms::none);
 }
 
 
@@ -87,7 +80,7 @@ bool utils::command_in_path(const char *command)
 {
     const char *env = getenv("PATH");
 
-    if (!env) {
+    if (!env || !*env) {
         return false;
     }
 
@@ -112,7 +105,7 @@ bool utils::command_in_path(const char *command)
     for (auto &e : list) {
         auto st = fs::status(e);
 
-        if (fs::is_regular_file(st) && is_executable(st)) {
+        if (fs::is_regular_file(st) && is_executable(st.permissions())) {
             return true;
         }
     }

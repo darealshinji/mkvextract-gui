@@ -69,21 +69,29 @@ bool pipe_command::open_pipe()
     }
 
     if (pipe2(fd, O_CLOEXEC) == -1) {
+        perror("pipe2()");
         return false;
     }
 
-    if ((m_pid = vfork()) != 0) {
+    m_pid = fork();
+
+    if (m_pid == -1) {
+        /* error */
+        perror("fork()");
+        return false;
+    } else if (m_pid == 0) {
+        /* child */
+        close(fd[r]);
+        dup2(fd[w], 1);
+        close(fd[w]);
+        execvp(m_argv[0], m_argv);
+        _exit(127);
+    } else {
+        /* parent */
         close(fd[w]);
         m_fp = fdopen(fd[r], "r");
         return is_open();
     }
-
-    close(fd[r]);
-    dup2(fd[w], 1);
-    close(fd[w]);
-
-    execvp(m_argv[0], m_argv);
-    _exit(127);
 }
 
 
